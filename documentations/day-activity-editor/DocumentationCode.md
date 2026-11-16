@@ -1,0 +1,745 @@
+# DayActivityEditor — documentazione del codice
+
+## 1. Il componente in sintesi
+
+Finestra modale che il calendario apre dalla voce "Gestisci attività" del menu di un giorno.
+Permette di aggiungere, modificare ed eliminare le attività legate al tempo di quel giorno
+(Sonno, Lavoro, Studio, Lettura, Sport, Tempo libero, Attività personalizzata).
+Ogni attività occupa un intervallo orario (inizio e fine): è questo intervallo che permette
+di disegnare sulla timeline circolare il tempo occupato nella giornata.
+Prima di salvare controlla i campi obbligatori del tipo scelto, che l'orario
+stia dentro il giorno e che l'attività non si sovrapponga ad altre.
+I dati vengono letti e salvati tramite `StorageService`.
+È pensata per essere usabile anche da tastiera e con screen reader.
+
+## 2. Librerie e import
+
+### Angular — `@angular/core`
+| Import | A cosa serve qui |
+|---|---|
+| `Component` | Dichiara la classe come componente Angular (selettore, template, stili). |
+| `input`, `output` | Ricevono il giorno dal calendario (`date`) e gli segnalano la chiusura (`closed`). |
+| `signal`, `computed` | Stato reattivo della finestra e valori derivati dalla data (es. `dateKey`, `events`). |
+| `effect` | Ripristina il form ogni volta che cambia il giorno. |
+| `inject` | Ottiene i servizi necessari (`StorageService`, `Injector`). |
+| `Injector` | Serve ad `afterNextRender` quando è chiamato dentro un metodo. |
+| `afterNextRender` | Esegue codice dopo che Angular ha aggiornato la pagina (gestione del focus). |
+| `ViewChild`, `ElementRef` | Raggiungono il pulsante di chiusura nel template per dargli il focus. |
+| `HostListener` | Chiude la finestra quando si preme Esc. |
+
+### Angular — `@angular/core/rxjs-interop`
+| Import | A cosa serve qui |
+|---|---|
+| `takeUntilDestroyed` | Interrompe gli ascolti del form quando la finestra viene chiusa, evitando sprechi di memoria. |
+
+### Angular — `@angular/forms`
+| Import | A cosa serve qui |
+|---|---|
+| `FormGroup`, `FormControl` | Costruiscono il form tipizzato con tutti i campi delle attività. |
+| `Validators` | Regole di validazione (campi obbligatori, testo non vuoto). |
+| `ReactiveFormsModule` | Collega il form del TypeScript ai campi dell'HTML (`formGroup`, `formControlName`). |
+
+### Traduzioni — `@ngx-translate/core`
+| Import | A cosa serve qui |
+|---|---|
+| `TranslateModule` | Rende disponibile nel template il pipe `translate` per i testi in italiano e inglese. |
+
+### Date — `dayjs`
+| Import | A cosa serve qui |
+|---|---|
+| `dayjs` | Calcola il giorno successivo, legge l'ora attuale e controlla la validità degli orari. |
+
+### File del progetto
+| Import | Da dove | A cosa serve qui |
+|---|---|---|
+| `formatDate` | `functions/date-utils` | Trasforma una `Date` nel testo `YYYY-MM-DD` usato come chiave del giorno. |
+| `TimelineEvent` | `models/calendar-event.model` | Tipo che descrive un'attività legata al tempo e i suoi 7 tipi. |
+| `EVENT_COLORS`, `eventTitle` | `models/event-presentation` | Colore di ogni tipo di attività e titolo da mostrare nell'elenco. |
+| `StorageService` | `services/storage.service` | Legge e salva le giornate con le loro attività. |
+
+## 3. Blocchi di codice
+
+### 5.1 — constructor()
+
+```ts
+constructor()
+{
+  this.form.controls.type.valueChanges.pipe(takeUntilDestroyed()).subscribe(type => {
+    this.selectedType.set(type);
+    this.updateRequiredFields(type);
+  });
+  this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+    this.invalidFields.set(false);
+    this.invalidInterval.set(false);
+    this.savedMessage.set(null);
+  });
+  effect(() => {
+    this.dateKey();
+    this.resetForm();
+    this.pendingDelete.set(null);
+  });
+}
+```
+
+**Scopo**
+Prepara i comportamenti automatici della finestra appena viene creata:
+reagisce al cambio del tipo di attività, nasconde gli errori quando l'utente
+modifica un campo e ripristina il form ogni volta che cambia il giorno.
+
+**Quando viene chiamato**
+Una sola volta, da Angular, quando il calendario apre la finestra.
+
+**Come funziona**
+1. **Cambio del tipo di attività**
+   `form.controls.type.valueChanges` emette un valore ogni volta che cambia
+   la tendina del tipo. A ogni cambio:
+   - `selectedType` viene aggiornato, e il template mostra i campi di quel tipo;
+   - `updateRequiredFields(type)` rende obbligatori i campi previsti da `REQUIRED_BY_TYPE`.
+2. **Modifica di un qualsiasi campo**
+   `form.valueChanges` emette a ogni modifica del form. A ogni modifica
+   `invalidFields` e `invalidInterval` tornano a `false` e `savedMessage` torna a `null`:
+   i messaggi di errore e l'avviso di salvataggio spariscono appena l'utente
+   modifica il form.
+3. **Cambio del giorno**
+   `effect` riesegue il suo contenuto ogni volta che cambia un signal letto al suo interno.
+   Legge `dateKey()`, quindi si riattiva all'apertura e a ogni nuovo giorno passato dal calendario. Allora:
+   - `resetForm()` svuota il form e imposta come inizio l'ora attuale del giorno scelto;
+   - `pendingDelete` torna a `null`, chiudendo un'eventuale conferma di eliminazione.
+
+**Note**
+- `takeUntilDestroyed()` interrompe automaticamente gli ascolti 1 e 2
+  quando la finestra viene chiusa, così non restano attivi in memoria.
+- I campi obbligatori del tipo iniziale vengono impostati grazie al punto 3:
+  `resetForm()` imposta il tipo `Work`, questo fa scattare il punto 1
+  e quindi `updateRequiredFields`.
+
+### 5.2 — trapFocus(event)
+
+```ts
+trapFocus(event: Event): void
+{
+  const window = event.currentTarget as HTMLElement;
+  const focusable = window.querySelectorAll<HTMLElement>('button, input, select, textarea');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const shift = (event as KeyboardEvent).shiftKey;
+  if (!shift && document.activeElement === last) { first.focus(); event.preventDefault(); }
+  if (shift && document.activeElement === first) { last.focus(); event.preventDefault(); }
+}
+```
+
+**Scopo**
+Tiene il focus dentro la finestra mentre è aperta: Tab sull'ultimo elemento
+torna al primo, Shift+Tab sul primo va all'ultimo.
+Pensato per l'accessibilità, in particolare per i non vedenti: chi usa uno
+screen reader o solo la tastiera non esce dalla finestra senza accorgersene.
+
+**Quando viene chiamato**
+Dal template, sulla `<section role="dialog">`:
+`(keydown.tab)` e `(keydown.shift.tab)`. Angular distingue i due tasti,
+per questo servono entrambi.
+
+**Come funziona**
+1. `event.currentTarget` è la finestra che ha ricevuto il tasto.
+2. `querySelectorAll('button, input, select, textarea')` raccoglie gli elementi
+   raggiungibili con Tab, nell'ordine in cui compaiono nella pagina.
+3. `first` e `last` sono il primo (pulsante ×) e l'ultimo elemento dell'elenco.
+4. `shiftKey` indica se è premuto Shift, cioè se si sta andando all'indietro.
+5. Se si va avanti dall'ultimo, il focus passa al primo; se si va indietro
+   dal primo, passa all'ultimo.
+6. `event.preventDefault()` blocca lo spostamento normale del Tab,
+   che altrimenti porterebbe il focus fuori dalla finestra (sul calendario).
+
+### 5.3 — @ViewChild closeButton + ngAfterViewInit()
+
+```ts
+@ViewChild('closeButton') private closeButton?: ElementRef<HTMLButtonElement>;
+ngAfterViewInit(): void
+{
+  this.closeButton?.nativeElement.focus();
+}
+```
+
+**Scopo**
+All'apertura della finestra porta il focus sul pulsante di chiusura (×).
+Così chi usa la tastiera o uno screen reader si trova subito dentro la finestra,
+invece di restare sul calendario sottostante.
+
+**Quando viene chiamato**
+`ngAfterViewInit` è chiamato da Angular una sola volta, appena il template
+della finestra è stato disegnato.
+
+**Come funziona**
+1. `@ViewChild('closeButton')` cerca nel template l'elemento segnato con
+   `#closeButton` (il pulsante ×) e lo salva nella proprietà `closeButton`.
+2. `ElementRef<HTMLButtonElement>` è il contenitore che Angular usa per l'elemento:
+   il pulsante vero si raggiunge con `.nativeElement`.
+3. In `ngAfterViewInit` il pulsante è ormai disponibile, quindi
+   `this.closeButton?.nativeElement.focus()` gli dà il focus.
+
+**Note**
+- `closeButton` non è disponibile nel `constructor`, perché il template non è
+  ancora stato disegnato: per questo il focus viene dato in `ngAfterViewInit`.
+- Il `?` evita un errore nel caso, solo teorico, in cui il pulsante non venga trovato.
+- Insieme a 5.2 (`trapFocus`) e alla gestione del focus nell'eliminazione,
+  fa parte del percorso tastiera della finestra.
+
+### 5.4 — close()
+
+```ts
+@HostListener('document:keydown.escape')
+close(): void
+{
+  this.closed.emit();
+}
+```
+
+**Scopo**
+Chiede al calendario di chiudere la finestra.
+La finestra non si chiude da sola: avvisa il calendario, che decide di rimuoverla.
+
+**Quando viene chiamato**
+In tre modi:
+- clic sul pulsante × (template, `(click)="close()"` sul pulsante con `#closeButton`);
+- clic sullo sfondo semitrasparente (template, `(click)="close()"` su `.activity-editor-overlay`);
+- tasto Esc, grazie a `@HostListener('document:keydown.escape')`.
+
+**Come funziona**
+1. `@HostListener('document:keydown.escape')` ascolta il tasto Esc su tutta la pagina
+   e, quando viene premuto, chiama `close()`.
+2. `this.closed.emit()` invia l'evento di output `closed` al calendario.
+3. Il calendario lo riceve con `(closed)="closeActivityEditor()"`: imposta
+   `editorDate` a `null`, così la finestra viene rimossa, e riporta il focus
+   sul giorno selezionato.
+
+**Note**
+- Un clic dentro la finestra non la chiude, perché la `<section>` blocca il clic
+  con `$event.stopPropagation()` prima che arrivi allo sfondo.
+
+### 5.5 — timeLabel(value)
+
+```ts
+timeLabel(value: string): string
+{
+  return value.slice(0, 10) === this.dateKey() ? value.slice(11, 16) : '24:00';
+}
+```
+
+**Scopo**
+Trasforma l'orario salvato di un'attività nel testo da mostrare nell'elenco
+(es. `09:30`). La mezzanotte del giorno dopo viene mostrata come `24:00`.
+
+**Quando viene chiamato**
+Dal template, nell'elenco delle attività registrate:
+`{{ timeLabel(event.start) }}–{{ timeLabel(event.end) }}`.
+
+**Come funziona**
+1. `value` ha il formato `YYYY-MM-DDTHH:mm`, ad esempio `2026-11-09T09:30`.
+2. `value.slice(0, 10)` prende la parte della data (`2026-11-09`)
+   e la confronta con `dateKey()`, il giorno della finestra.
+3. Se è lo stesso giorno, `value.slice(11, 16)` restituisce solo l'ora (`09:30`).
+4. Altrimenti restituisce `'24:00'`.
+
+**Note**
+- Un'attività può finire alla mezzanotte del giorno dopo (es. `2026-11-10T00:00`).
+  Mostrarla come `00:00` sarebbe confuso (`22:00–00:00`), per questo diventa `24:00`.
+- Il caso "altro giorno" può essere solo quella mezzanotte, perché
+  `isValidInterval` non accetta orari oltre `dayEnd`.
+
+### 5.6 — startNew()
+
+```ts
+startNew(): void
+{
+  this.resetForm();
+  this.pendingDelete.set(null);
+}
+```
+
+**Scopo**
+Prepara la finestra per inserire una nuova attività: svuota il form
+e chiude un'eventuale conferma di eliminazione aperta.
+
+**Quando viene chiamato**
+Dal template, con il pulsante "Svuota form" sotto il form
+(`(click)="startNew()"`, testo `DayActivityEditor.ClearForm`).
+
+**Come funziona**
+1. `resetForm()` riporta il form ai valori iniziali e annulla un'eventuale
+   modifica in corso (vedi 5.8).
+2. `pendingDelete.set(null)` nasconde la conferma di eliminazione, se era aperta.
+
+**Note**
+- Rispetto a `resetForm()` fa una cosa in più: chiude anche la conferma di eliminazione.
+  Per questo il pulsante chiama `startNew()` e non direttamente `resetForm()`.
+
+### 5.7 — edit(event)
+
+```ts
+edit(event: TimelineEvent): void
+{
+  if (!this.events().includes(event)) return;
+  this.resetForm();
+  this.pendingDelete.set(null);
+  this.editingEvent.set(event);
+  this.form.patchValue({
+    type: event.type,
+    start: event.start,
+    end: event.end,
+    note: event.note ?? '',
+  });
+
+  switch (event.type) {
+    case 'Sleep':
+      this.form.patchValue({ dream: event.dream ?? '' }); break;
+    case 'Work': break;
+    case 'Study':
+      this.form.patchValue({ subject: event.subject, goal: event.goal ?? '' }); break;
+    case 'Reading':
+      this.form.patchValue({ book: event.book, author: event.author }); break;
+    case 'Sport':
+      this.form.patchValue({ sport: event.sport, workout: event.workout ?? '' }); break;
+    case 'FreeTime':
+      this.form.patchValue({ hobby: event.hobby ?? '' }); break;
+    case 'CustomActivity':
+      this.form.patchValue({ activity: event.activity, category: event.category ?? '' }); break;
+  }
+}
+```
+
+**Scopo**
+Carica nel form l'attività scelta dall'elenco, così l'utente può modificarla.
+Al salvataggio, `save()` sostituirà questa attività invece di crearne una nuova.
+
+**Quando viene chiamato**
+Dal template, con il pulsante "Modifica" di ogni attività dell'elenco
+(`(click)="edit(event)"`).
+
+**Come funziona**
+1. Se l'attività non è più tra quelle del giorno (`events()`), il metodo si ferma.
+2. `resetForm()` cancella i valori di una modifica precedente (vedi 5.8).
+3. `pendingDelete.set(null)` chiude un'eventuale conferma di eliminazione.
+4. `editingEvent.set(event)` ricorda quale attività sostituire al salvataggio.
+   Viene dopo `resetForm()`, che altrimenti lo riporterebbe a `null`.
+5. Il primo `patchValue` carica i campi comuni a tutti i tipi: tipo, inizio, fine e nota.
+   Se la nota manca (`?? ''`), il campo resta vuoto.
+6. Lo `switch` carica i campi specifici del tipo (es. libro e autore per `Reading`).
+   `Work` non ha campi specifici.
+
+**Note**
+- Cambiare il `type` con `patchValue` fa scattare l'ascolto del 5.1 (punto 1):
+  il template mostra i campi di quel tipo e `updateRequiredFields` li rende obbligatori.
+- `patchValue` aggiorna solo i campi indicati e lascia gli altri come sono:
+  per questo può essere chiamato due volte, prima per i campi comuni e poi per quelli del tipo.
+
+### 5.8 — resetForm()
+
+```ts
+resetForm(): void
+{
+  this.editingEvent.set(null);
+  this.invalidFields.set(false);
+  this.invalidInterval.set(false);
+  this.form.reset({ start: `${this.dateKey()}T${dayjs().format('HH:mm')}` });
+}
+```
+
+**Scopo**
+Riporta la finestra allo stato "nuova attività": nessuna modifica in corso,
+nessun errore visibile e form con i valori iniziali.
+
+**Quando viene chiamato**
+Da diversi punti del componente:
+- all'apertura e al cambio del giorno (5.1, `effect`);
+- dal pulsante "Svuota form" (5.6, `startNew`);
+- prima di caricare un'attività da modificare (5.7, `edit`);
+- dopo un salvataggio riuscito (`save`);
+- quando si chiede di eliminare un'attività (`requestDelete`).
+
+**Come funziona**
+1. `editingEvent.set(null)`: nessuna attività è più in modifica,
+   quindi il prossimo salvataggio creerà un'attività nuova.
+2. `invalidFields` e `invalidInterval` tornano a `false`: i messaggi di errore spariscono.
+3. `form.reset({ start: ... })` reimposta tutti i campi:
+   - `start` diventa il giorno della finestra con l'ora attuale
+     (es. `2026-11-09T15:42`), così l'utente parte da un orario sensato;
+   - tutti gli altri campi, non indicati, tornano al valore iniziale definito
+     nel `form` (`Work` per `type`, vuoto per gli altri). Succede perché i
+     controlli sono `nonNullable`.
+
+**Note**
+- `form.reset` non cambia solo i valori: toglie anche lo stato "toccato" dei campi,
+  impostato da `markAllAsTouched()` in `save()` quando il form era invalido.
+- Il reset fa scattare gli ascolti del 5.1: il tipo `Work` aggiorna i campi
+  obbligatori tramite `updateRequiredFields`.
+
+### 5.9 — save()
+
+```ts
+save(): void
+{
+  if (this.form.invalid) {
+    this.form.markAllAsTouched();
+    this.invalidFields.set(true);
+    return;
+  }
+
+  const value = this.form.getRawValue();
+  if (!this.isValidInterval(value.start, value.end)) {
+    this.invalidInterval.set(true);
+    return;
+  }
+
+  const current = this.storage.getDay(this.dateKey());
+  const timeline = [...(current?.timeline ?? [])];
+  const editing = this.editingEvent();
+  const overlaps = timeline.some(existing => existing !== editing
+    && value.start < existing.end
+    && value.end > existing.start);
+  if (overlaps) {
+    this.invalidInterval.set(true);
+    return;
+  }
+
+  const event = this.toEvent(value);
+  if (editing) {
+    const index = timeline.indexOf(editing);
+    if (index < 0) {
+      this.resetForm();
+      return;
+    }
+    timeline[index] = event;
+  } else {
+    timeline.push(event);
+  }
+
+  this.storage.saveDay({
+    id: current?.id ?? `day-${this.dateKey()}`,
+    date: this.dateKey(),
+    timeline: timeline.sort((a, b) => a.start.localeCompare(b.start)),
+    extra: current?.extra ?? [],
+  });
+  this.resetForm();
+  this.savedMessage.set(editing ? 'DayActivityEditor.Updated' : 'DayActivityEditor.Added');
+  setTimeout(() => this.savedMessage.set(null), 5000);
+}
+```
+
+**Scopo**
+Controlla i dati del form e salva l'attività nel giorno: ne crea una nuova
+oppure sostituisce quella in modifica.
+
+**Quando viene chiamato**
+Dal template, all'invio del form con il pulsante "Salva" (`(ngSubmit)="save()"`).
+
+**Come funziona**
+Il metodo procede per controlli successivi: al primo che fallisce mostra
+l'errore e si ferma, senza salvare nulla.
+
+1. **Campi del form**
+   Se il form è invalido (es. un campo obbligatorio vuoto), `markAllAsTouched()`
+   segna tutti i campi come "toccati" e `invalidFields` mostra il messaggio
+   "campi obbligatori".
+2. **Orari nel giorno**
+   `getRawValue()` legge i valori del form. `isValidInterval` (vedi 5.14) controlla
+   che inizio e fine siano validi e dentro il giorno; se no, `invalidInterval`
+   mostra il messaggio di intervallo non valido.
+3. **Sovrapposizioni**
+   `current` è il giorno salvato; `timeline` è una **copia** delle sue attività.
+   `overlaps` è vero se un'attività esistente (diversa da quella in modifica)
+   si sovrappone a quella nuova: inizia prima che la nuova finisca e finisce
+   dopo che la nuova inizia. In quel caso si mostra lo stesso messaggio di intervallo.
+4. **Nuova o modificata**
+   `toEvent` (vedi 5.15) costruisce l'attività dai valori del form.
+   - In modifica: si cerca la posizione dell'attività originale e la si sostituisce.
+     Se non c'è più, si annulla la modifica senza salvare.
+   - Altrimenti: l'attività viene aggiunta in fondo.
+5. **Salvataggio**
+   `storage.saveDay` salva il giorno con le attività ordinate per orario di inizio.
+   Riusa l'`id` e gli `extra` del giorno, se esisteva già, altrimenti li crea.
+6. **Ripartenza e avviso**
+   `resetForm()` (vedi 5.8) prepara il form per una nuova attività.
+   Subito dopo, `savedMessage` riceve la chiave del messaggio da mostrare:
+   `DayActivityEditor.Updated` se era una modifica, `DayActivityEditor.Added`
+   se era una nuova attività. `setTimeout` lo riporta a `null` dopo 5 secondi
+   (5000 millisecondi), così l'avviso sparisce da solo.
+
+**Note**
+- Attività consecutive sono ammesse: se una finisce alle `10:00` e l'altra inizia
+  alle `10:00`, il confronto `value.start < existing.end` è falso e non c'è sovrapposizione.
+- Gli orari si confrontano come testi (`<`, `>`, `localeCompare`). Funziona perché
+  il formato `YYYY-MM-DDTHH:mm` mette prima le parti più importanti: l'ordine
+  alfabetico coincide con l'ordine nel tempo.
+- `timeline` è una copia (`[...]`) per non modificare direttamente i dati dello
+  storage: il giorno cambia solo con `saveDay`.
+- Avviso di salvataggio: nel template c'è uno `<span class="success" role="status">`
+  sempre presente ma **vuoto**. Si valorizza nel momento esatto in cui un'attività
+  viene aggiunta o modificata, perché `savedMessage` passa da `null` alla chiave
+  del messaggio e `@if` scrive il testo tradotto.
+  Lo span resta sempre nella pagina perché lo screen reader annuncia in modo
+  affidabile solo i cambi di testo dentro una zona `role="status"` già esistente.
+- Quando lo span è vuoto, la regola SCSS `.success:empty { padding: 0; }` toglie il
+  padding: il riquadro verde ha dimensione zero e non si vede. Non si usa
+  `display: none`, che toglierebbe lo span anche allo screen reader.
+- `savedMessage` va impostato **dopo** `resetForm()`: il reset fa scattare
+  `form.valueChanges` (5.1, punto 2), che altrimenti lo riporterebbe subito a `null`.
+- Se si salva due volte entro 5 secondi, il timer del primo salvataggio può
+  nascondere in anticipo il secondo avviso. È un caso raro e volutamente non gestito.
+
+### 5.10 — cancelDelete(click)
+
+```ts
+cancelDelete(click: Event): void
+{
+  const item = (click.currentTarget as HTMLElement).closest('li');
+  this.pendingDelete.set(null);
+  afterNextRender(() => item?.querySelector<HTMLElement>('.request-delete')?.focus(), { injector: this.injector });
+}
+```
+
+**Scopo**
+Annulla la richiesta di eliminazione: nasconde la conferma senza eliminare
+l'attività e riporta il focus sul pulsante "Elimina" della stessa attività.
+
+**Quando viene chiamato**
+Dal template, con il pulsante "Annulla" della conferma di eliminazione
+(`(click)="cancelDelete($event)"`).
+
+**Come funziona**
+1. `click.currentTarget` è il pulsante "Annulla" premuto; `closest('li')` risale
+   alla riga dell'elenco che lo contiene. La riga va ricordata subito,
+   perché il pulsante sta per sparire.
+2. `pendingDelete.set(null)` nasconde la conferma: nella riga ricompaiono
+   i pulsanti "Modifica" ed "Elimina".
+3. `afterNextRender` aspetta che Angular abbia aggiornato la pagina, poi cerca nella
+   riga il pulsante con classe `request-delete` ("Elimina") e gli dà il focus.
+
+**Note**
+- Accessibilità: senza il punto 3 il pulsante "Annulla" sparirebbe con il focus sopra,
+  e chi usa tastiera o screen reader verrebbe riportato all'inizio della pagina.
+- `injector` serve ad `afterNextRender` perché è chiamato dentro un metodo
+  e non nel `constructor`.
+- La riga `<li>` resta nella pagina: cambiano solo i pulsanti al suo interno.
+  Per questo `item` è ancora valido dopo l'aggiornamento.
+
+### 5.11 — requestDelete(event)
+
+```ts
+requestDelete(event: TimelineEvent): void
+{
+  if (!this.events().includes(event)) return;
+  this.resetForm();
+  this.pendingDelete.set(event);
+  afterNextRender(() => document.querySelector<HTMLElement>('.cancel-delete')?.focus(), { injector: this.injector });
+}
+```
+
+**Scopo**
+Primo passo dell'eliminazione: non elimina nulla, ma mostra nella riga
+dell'attività la domanda di conferma con i pulsanti "Conferma" e "Annulla".
+
+**Quando viene chiamato**
+Dal template, con il pulsante "Elimina" di ogni attività dell'elenco
+(`(click)="requestDelete(event)"`, classe `request-delete`).
+
+**Come funziona**
+1. Se l'attività non è più tra quelle del giorno (`events()`), il metodo si ferma.
+2. `resetForm()` chiude un'eventuale modifica in corso (vedi 5.8), così non si
+   modifica e si elimina la stessa attività nello stesso momento.
+3. `pendingDelete.set(event)` ricorda l'attività da eliminare: il template mostra
+   la conferma nella sua riga, al posto di "Modifica" ed "Elimina".
+4. `afterNextRender` aspetta che la conferma compaia, poi dà il focus al pulsante
+   con classe `cancel-delete` ("Annulla").
+
+**Note**
+- Il focus va su "Annulla" e non su "Conferma" per sicurezza: un Invio premuto
+  per sbaglio non cancella nulla.
+- Nel template "Annulla" ha `aria-describedby="confirm-delete-question"`:
+  lo screen reader legge il pulsante insieme alla domanda di conferma.
+- C'è una sola conferma aperta alla volta, quindi `document.querySelector`
+  trova sempre il pulsante giusto.
+
+### 5.12 — confirmDelete(event)
+
+```ts
+confirmDelete(event: TimelineEvent): void
+{
+  if (this.pendingDelete() !== event) return;
+  const current = this.storage.getDay(this.dateKey());
+  const index = current?.timeline.indexOf(event) ?? -1;
+  if (current && index >= 0) {
+    this.storage.saveDay({
+      ...current,
+      timeline: current.timeline.filter((_, eventIndex) => eventIndex !== index),
+    });
+  }
+  this.pendingDelete.set(null);
+  afterNextRender(() => document.querySelector<HTMLElement>('.recorded-title')?.focus(), { injector: this.injector });
+}
+```
+
+**Scopo**
+Secondo passo dell'eliminazione: elimina davvero l'attività confermata,
+salva il giorno aggiornato e porta il focus sul titolo dell'elenco.
+
+**Quando viene chiamato**
+Dal template, con il pulsante "Conferma" della conferma di eliminazione
+(`(click)="confirmDelete(event)"`).
+
+**Come funziona**
+1. Se `event` non è l'attività in attesa di conferma (`pendingDelete()`),
+   il metodo si ferma.
+2. `current` è il giorno salvato; `index` è la posizione dell'attività nelle sue
+   attività, oppure `-1` se non c'è (`?? -1` copre anche il caso di giorno assente).
+3. Se giorno e attività esistono, `storage.saveDay` salva il giorno:
+   - `...current` copia tutti i suoi dati (id, data, extra);
+   - `timeline` viene sostituita da una nuova lista senza l'attività in posizione `index`.
+4. `pendingDelete.set(null)` chiude la conferma.
+5. `afterNextRender` aspetta che la riga eliminata sparisca, poi dà il focus
+   al titolo "Attività registrate" (classe `recorded-title`).
+
+**Note**
+- Accessibilità: il titolo ha `tabindex="-1"` nel template, che permette di dargli
+  il focus dal codice senza aggiungerlo al percorso del Tab. Funziona anche se
+  l'elenco resta vuoto.
+- `filter` crea una nuova lista invece di modificare quella esistente: i dati
+  dello storage cambiano solo con `saveDay`, come in `save()` (5.9).
+- In vista di un database: oggi l'eliminazione salva l'intero giorno senza l'attività.
+  Con un database diventerà una richiesta di eliminazione della singola attività
+  tramite il suo `id`, e i punti 4 e 5 andranno eseguiti dopo la risposta del server.
+
+### 5.13 — updateRequiredFields(type)
+
+```ts
+private updateRequiredFields(type: TimelineEvent['type']): void
+{
+  const required = REQUIRED_BY_TYPE[type];
+
+  for (const field of REQUIRED_FIELDS)
+  {
+    const control = this.form.controls[field];
+    control.setValidators(required.includes(field) ? [Validators.required, Validators.pattern(/\S/)] : []);
+    control.updateValueAndValidity({ emitEvent: false });
+  }
+}
+```
+
+**Scopo**
+Rende obbligatori solo i campi previsti per il tipo di attività scelto
+e toglie l'obbligo a tutti gli altri.
+
+**Quando viene chiamato**
+Solo dall'interno del componente (`private`): dal 5.1, ogni volta che cambia
+il tipo nel form (tendina, `resetForm` o `edit`).
+
+**Come funziona**
+1. `REQUIRED_BY_TYPE[type]` restituisce i campi obbligatori del tipo
+   (es. `['book', 'author']` per `Reading`, `[]` per `Work`).
+2. Il ciclo scorre `REQUIRED_FIELDS`, cioè tutti i campi che almeno un tipo
+   rende obbligatori: `subject`, `book`, `author`, `sport`, `activity`.
+3. Per ogni campo, `setValidators` imposta:
+   - se il campo è tra quelli del tipo: `Validators.required` (non vuoto)
+     e `Validators.pattern(/\S/)` (almeno un carattere che non sia uno spazio);
+   - altrimenti: nessun validatore (`[]`).
+4. `updateValueAndValidity` ricalcola subito se il campo è valido con le nuove regole.
+
+**Note**
+- `Validators.pattern(/\S/)` impedisce di salvare un campo che contiene solo spazi,
+  che `Validators.required` da solo accetterebbe.
+- `{ emitEvent: false }` evita che il ricalcolo faccia scattare `form.valueChanges`
+  (5.1, punto 2), che nasconderebbe gli errori senza che l'utente abbia modificato nulla.
+- Convenzione del progetto: le regole stanno solo qui e in `REQUIRED_BY_TYPE`.
+  Nell'HTML i campi obbligatori hanno solo `aria-required="true"`, che deve
+  corrispondere a questi validatori.
+
+### 5.14 — isValidInterval(start, end)
+
+```ts
+private isValidInterval(start: string, end: string): boolean
+{
+  const format = 'YYYY-MM-DDTHH:mm';
+  const startTime = dayjs(start);
+  const endTime = dayjs(end);
+  return startTime.isValid() && endTime.isValid()
+    && startTime.format(format) === start && endTime.format(format) === end
+    && !startTime.isBefore(this.dayStart()) && !endTime.isAfter(this.dayEnd())
+    && endTime.isAfter(startTime);
+}
+```
+
+**Scopo**
+Controlla che inizio e fine di un'attività siano orari validi, dentro il giorno
+della finestra (fino alla mezzanotte successiva compresa), e che la fine venga dopo l'inizio.
+
+**Quando viene chiamato**
+Solo dall'interno del componente (`private`): da `save()` (5.9, punto 2),
+dopo il controllo dei campi obbligatori.
+
+**Come funziona**
+Restituisce `true` solo se tutte e quattro le condizioni sono vere:
+1. **Date leggibili**: `dayjs(...)` interpreta i due testi e `isValid()`
+   controlla che siano date vere.
+2. **Formato esatto**: riconvertendo la data in testo con `format` si deve
+   ottenere esattamente il testo di partenza (es. `2026-11-09T09:30`).
+3. **Dentro il giorno**: l'inizio non è prima di `dayStart()` (mezzanotte del giorno)
+   e la fine non è dopo `dayEnd()` (mezzanotte del giorno dopo).
+4. **Ordine corretto**: la fine è strettamente dopo l'inizio, quindi niente
+   attività di durata zero.
+
+**Note**
+- Il controllo del formato (punto 2) serve perché dayjs "aggiusta" le date impossibili:
+  `2026-02-31` diventerebbe il 3 marzo. Confrontando con il testo originale
+  la differenza emerge e l'orario viene rifiutato.
+- Il formato fisso garantisce anche che i confronti tra testi in `save()` (5.9)
+  e `timeLabel()` (5.5) funzionino correttamente.
+- La mezzanotte del giorno dopo è accettata come fine: è il caso che `timeLabel`
+  mostra come `24:00`.
+
+### 5.15 — toEvent(value)
+
+```ts
+private toEvent(value: ActivityFormValue): TimelineEvent
+{
+  const note = value.note.trim();
+  const interval = { start: value.start, end: value.end, ...(note ? { note } : {}) };
+  switch (value.type) {
+    case 'Sleep': return { ...interval, type: 'Sleep', ...(value.dream.trim() ? { dream: value.dream.trim() } : {}) };
+    case 'Work': return { ...interval, type: 'Work' };
+    case 'Study': return { ...interval, type: 'Study', subject: value.subject.trim(), ...(value.goal.trim() ? { goal: value.goal.trim() } : {}) };
+    case 'Reading': return { ...interval, type: 'Reading', book: value.book.trim(), author: value.author.trim() };
+    case 'Sport': return { ...interval, type: 'Sport', sport: value.sport.trim(), ...(value.workout.trim() ? { workout: value.workout.trim() } : {}) };
+    case 'FreeTime': return { ...interval, type: 'FreeTime', ...(value.hobby.trim() ? { hobby: value.hobby.trim() } : {}) };
+    case 'CustomActivity': return { ...interval, type: 'CustomActivity', activity: value.activity.trim(), ...(value.category.trim() ? { category: value.category.trim() } : {}) };
+    default: throw new Error('Unsupported activity type');
+  }
+}
+```
+
+**Scopo**
+Trasforma i valori del form nell'oggetto attività previsto dal modello
+`TimelineEvent`, con solo i campi del tipo scelto.
+
+**Quando viene chiamato**
+Solo dall'interno del componente (`private`): da `save()` (5.9, punto 4),
+dopo che tutti i controlli sono passati.
+
+**Come funziona**
+1. `value` contiene tutti i campi del form (`ActivityFormValue`), anche quelli
+   degli altri tipi, che sono vuoti.
+2. `interval` raccoglie i dati comuni: inizio, fine e, se non vuota, la nota.
+3. Lo `switch` sceglie il tipo e costruisce l'oggetto finale:
+   - `...interval` copia i dati comuni;
+   - `type` indica il tipo di attività;
+   - si aggiungono solo i campi di quel tipo (es. `book` e `author` per `Reading`).
+4. Tutti i testi passano da `trim()`, che toglie gli spazi all'inizio e alla fine.
+
+**Note**
+- La forma `...(testo ? { campo: testo } : {})` aggiunge un campo facoltativo
+  solo se ha un valore: se è vuoto, il campo non compare affatto nell'oggetto
+  (invece di comparire come stringa vuota).
+- I campi obbligatori (es. `subject`, `book`) sono sempre presenti: il form
+  ha già garantito che non siano vuoti (5.13).
+- Il `default` non dovrebbe mai scattare: è una rete di sicurezza nel caso
+  arrivi un tipo non previsto.
+- In vista di un database: l'oggetto creato è sempre nuovo. Quando le attività
+  avranno un `id`, in modifica bisognerà conservare l'`id` dell'attività originale.

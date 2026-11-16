@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Istruzioni locali per l'assistente (solo sul mio PC)
+CLAUDE.md

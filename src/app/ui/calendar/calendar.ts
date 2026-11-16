@@ -209,6 +209,8 @@ export class CalendarComponent implements OnDestroy {
   /** Nasconde la finestra quando il componente delle attività emette l'evento di chiusura. */
   closeActivityEditor(): void {
     this.editorDate.set(null);
+    // Accessibilità: riporta il focus sul giorno selezionato, così chi usa uno screen reader riprende da lì.
+    document.querySelector<HTMLElement>('.calendar-cell.selected')?.focus();
   }
 
   /** Chiude il menu a un clic nel documento, con Esc o durante altre azioni del calendario. */

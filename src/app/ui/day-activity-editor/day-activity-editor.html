@@ -1,0 +1,106 @@
+<div class="activity-editor-overlay" (click)="close()">
+  <section class="activity-editor-window" role="dialog" aria-modal="true"
+    [attr.aria-label]="'DayActivityEditor.Manage' | translate" (click)="$event.stopPropagation()"
+    (keydown.tab)="trapFocus($event)" (keydown.shift.tab)="trapFocus($event)">
+    <header class="window-header">
+      <div>
+        <h2>{{ 'DayActivityEditor.Manage' | translate }}</h2>
+        <p>{{ dateKey() }}</p>
+      </div>
+      <button #closeButton type="button" (click)="close()" [attr.aria-label]="'DayActivityEditor.Close' | translate">×</button>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <h3>{{ (editingEvent() ? 'DayActivityEditor.Edit' : 'DayActivityEditor.Add') | translate }}</h3>
+
+      <label>
+        {{ 'DayActivityEditor.Type' | translate }}
+        <select formControlName="type">
+          @for (type of types; track type) {
+            <option [value]="type">{{ 'EventTypes.' + type | translate }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="time-fields">
+        <label>
+          {{ 'DayActivityEditor.Start' | translate }}
+          <input type="datetime-local" formControlName="start" [min]="dayStart()" [max]="dayEnd()" aria-required="true">
+        </label>
+        <label>
+          {{ 'DayActivityEditor.End' | translate }}
+          <input type="datetime-local" formControlName="end" [min]="dayStart()" [max]="dayEnd()" aria-required="true">
+        </label>
+      </div>
+
+      @if (selectedType() === 'Sleep') {
+        <label>{{ 'DayActivityEditor.Dream' | translate }}<input formControlName="dream"></label>
+      }
+      @if (selectedType() === 'Study') {
+        <label>{{ 'DayActivityEditor.Subject' | translate }}<input formControlName="subject" aria-required="true"></label>
+        <label>{{ 'DayActivityEditor.Goal' | translate }}<input formControlName="goal"></label>
+      }
+      @if (selectedType() === 'Reading') {
+        <label>{{ 'DayActivityEditor.Book' | translate }}<input formControlName="book" aria-required="true"></label>
+        <label>{{ 'DayActivityEditor.Author' | translate }}<input formControlName="author" aria-required="true"></label>
+      }
+      @if (selectedType() === 'Sport') {
+        <label>{{ 'DayActivityEditor.Sport' | translate }}<input formControlName="sport" aria-required="true"></label>
+        <label>{{ 'DayActivityEditor.Workout' | translate }}<input formControlName="workout"></label>
+      }
+      @if (selectedType() === 'FreeTime') {
+        <label>{{ 'DayActivityEditor.Hobby' | translate }}<input formControlName="hobby"></label>
+      }
+      @if (selectedType() === 'CustomActivity') {
+        <label>{{ 'DayActivityEditor.Activity' | translate }}<input formControlName="activity" aria-required="true"></label>
+        <label>{{ 'DayActivityEditor.Category' | translate }}<input formControlName="category"></label>
+      }
+
+      <label>{{ 'DayActivityEditor.Note' | translate }}<textarea formControlName="note" rows="3"></textarea></label>
+
+      @if (invalidFields()) {
+        <p class="error" role="alert">{{ 'DayActivityEditor.RequiredFields' | translate }}</p>
+      }
+      @if (invalidInterval()) {
+        <p class="error" role="alert">{{ 'DayActivityEditor.InvalidInterval' | translate }}</p>
+      }
+
+      <div class="form-actions">
+        <button type="submit" class="primary-button">{{ 'DayActivityEditor.Save' | translate }}</button>
+        <button type="button" (click)="startNew()">{{ 'DayActivityEditor.ClearForm' | translate }}</button>
+        <span class="success" role="status">@if (savedMessage(); as message) { {{ message | translate }} }</span>
+      </div>
+    </form>
+
+    <section class="recorded-activities" [attr.aria-label]="'DayActivityEditor.RecordedActivities' | translate">
+      <h3 class="recorded-title" tabindex="-1">{{ 'DayActivityEditor.RecordedActivities' | translate }}</h3>
+      @if (events().length === 0) {
+        <p>{{ 'DayActivityEditor.EmptyActivities' | translate }}</p>
+      } @else {
+        <ul>
+          @for (event of events(); track event) {
+            <li [style.border-left-color]="eventColors[event.type]">
+              <div class="activity-summary">
+                <strong>{{ 'EventTypes.' + event.type | translate }}</strong>
+                <span>{{ timeLabel(event.start) }}–{{ timeLabel(event.end) }}</span>
+                @if (eventTitle(event)) { <span>{{ eventTitle(event) }}</span> }
+              </div>
+              @if (pendingDelete() === event) {
+                <p id="confirm-delete-question">{{ 'DayActivityEditor.ConfirmDelete' | translate }}</p>
+                <div class="activity-actions">
+                  <button type="button" (click)="confirmDelete(event)">{{ 'DayActivityEditor.Confirm' | translate }}</button>
+                  <button type="button" class="cancel-delete" aria-describedby="confirm-delete-question" (click)="cancelDelete($event)">{{ 'DayActivityEditor.Cancel' | translate }}</button>
+                </div>
+              } @else {
+                <div class="activity-actions">
+                  <button type="button" (click)="edit(event)">{{ 'DayActivityEditor.Edit' | translate }}</button>
+                  <button type="button" class="request-delete" (click)="requestDelete(event)">{{ 'DayActivityEditor.Delete' | translate }}</button>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </section>
+</div>

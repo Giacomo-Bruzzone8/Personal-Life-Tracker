@@ -72,7 +72,9 @@
     "Activity": "Activity",
     "Category": "Category",
     "RequiredFields": "Complete the required fields.",
-    "InvalidInterval": "Enter a valid time interval within the selected day."
+    "InvalidInterval": "Enter a valid time interval within the selected day.",
+    "Added": "Activity added.",
+    "Updated": "Activity updated."
   },
   "EventTypes": {
     "Sleep": "Sleep",

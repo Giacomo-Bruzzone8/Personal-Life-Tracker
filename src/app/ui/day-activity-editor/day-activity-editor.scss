@@ -1,0 +1,122 @@
+@use '../../../styles/theme';
+
+.activity-editor-overlay {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--app-background) 80%, transparent);
+}
+
+.activity-editor-window {
+  @include theme.surface;
+  width: min(100%, 720px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.window-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+
+  h2, p { margin: 0; }
+  p { margin-top: 4px; color: var(--surface-muted); }
+}
+
+button {
+  padding: 8px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-background);
+  color: var(--surface-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.primary-button {
+  border-color: var(--panel-background);
+  background: var(--panel-background);
+  color: var(--surface-background);
+}
+
+.recorded-activities {
+  margin-top: 24px;
+
+  h3 { margin: 0 0 12px; }
+  ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  li { padding: 10px; border: 1px solid var(--surface-border); border-left-width: 5px; border-radius: 6px; }
+  li > p { margin: 10px 0; }
+}
+
+.activity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+form {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius);
+
+  h3 { margin: 0; }
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input, select, textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-background);
+  color: var(--surface-text);
+  font: inherit;
+}
+
+.time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.form-actions, .activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.error { margin: 0; color: var(--selected-color); }
+
+.success {
+  align-self: center;
+  background-color: green;
+  border-radius: 4px;
+  color: white;
+  padding: 4px 8px;
+}
+.success:empty { padding: 0; }
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .time-fields { grid-template-columns: minmax(0, 1fr); }
+  .activity-editor-window { padding: 16px; }
+}

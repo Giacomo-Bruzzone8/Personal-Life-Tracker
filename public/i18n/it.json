@@ -72,7 +72,9 @@
     "Activity": "Attività",
     "Category": "Categoria",
     "RequiredFields": "Compila i campi obbligatori.",
-    "InvalidInterval": "Inserisci un intervallo valido all'interno della giornata selezionata."
+    "InvalidInterval": "Inserisci un intervallo valido all'interno della giornata selezionata.",
+    "Added": "Attività aggiunta.",
+    "Updated": "Attività modificata."
   },
   "EventTypes": {
     "Sleep": "Sonno",
