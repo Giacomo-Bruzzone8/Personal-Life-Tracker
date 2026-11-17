@@ -10,6 +10,8 @@ di disegnare sulla timeline circolare il tempo occupato nella giornata.
 Prima di salvare controlla i campi obbligatori del tipo scelto, che inizio e fine
 siano diversi e che l'attività non si sovrapponga ad altre.
 Un'attività può proseguire oltre la mezzanotte: in quel caso finisce il giorno dopo.
+Si salva nel giorno in cui inizia, ma compare anche nell'elenco del giorno in cui
+finisce e si può modificare o eliminare da entrambi i giorni.
 I dati vengono letti e salvati tramite `StorageService`.
 È pensata per essere usabile anche da tastiera e con screen reader.
 
@@ -20,7 +22,7 @@ I dati vengono letti e salvati tramite `StorageService`.
 |---|---|
 | `Component` | Dichiara la classe come componente Angular (selettore, template, stili). |
 | `input`, `output` | Ricevono il giorno dal calendario (`date`) e gli segnalano la chiusura (`closed`). |
-| `signal`, `computed` | Stato reattivo della finestra e valori derivati dalla data (es. `dateKey`, `events`). |
+| `signal`, `computed` | Stato reattivo della finestra e valori derivati dalla data (es. `dateKey`, `events`, `startDay`). |
 | `effect` | Ripristina il form ogni volta che cambia il giorno. |
 | `inject` | Ottiene i servizi necessari (`StorageService`, `Injector`). |
 | `Injector` | Serve ad `afterNextRender` quando è chiamato dentro un metodo. |
@@ -48,7 +50,7 @@ I dati vengono letti e salvati tramite `StorageService`.
 ### Date — `dayjs`
 | Import | A cosa serve qui |
 |---|---|
-| `dayjs` | Legge l'ora attuale (`resetForm`) e calcola la data del giorno successivo (`toDateTimes`). |
+| `dayjs` | Legge l'ora attuale (`resetForm`) e calcola le date dei giorni vicini (`shiftDay`). |
 
 ### File del progetto
 | Import | Da dove | A cosa serve qui |
@@ -223,13 +225,16 @@ In tre modi:
 timeLabel(value: string): string
 {
   const time = value.slice(11, 16);
-  return value.slice(0, 10) === this.dateKey() ? time : `${time} (+1)`;
+  const day = value.slice(0, 10);
+  if (day === this.dateKey()) return time;
+  return day < this.dateKey() ? `${time} (-1)` : `${time} (+1)`;
 }
 ```
 
 **Scopo**
 Trasforma l'orario salvato di un'attività nel testo da mostrare nell'elenco
-(es. `09:30`). Se l'orario cade nel giorno dopo, aggiunge `(+1)` (es. `07:00 (+1)`).
+(es. `09:30`). Se l'orario cade nel giorno dopo aggiunge `(+1)` (es. `07:00 (+1)`),
+se cade nel giorno prima aggiunge `(-1)` (es. `22:34 (-1)`).
 
 **Quando viene chiamato**
 Dal template, nell'elenco delle attività registrate:
@@ -238,16 +243,21 @@ Dal template, nell'elenco delle attività registrate:
 **Come funziona**
 1. `value` ha il formato `YYYY-MM-DDTHH:mm`, ad esempio `2026-11-09T09:30`.
 2. `time = value.slice(11, 16)` prende l'ora (`09:30`).
-3. `value.slice(0, 10)` prende la parte della data (`2026-11-09`)
+3. `day = value.slice(0, 10)` prende la parte della data (`2026-11-09`)
    e la confronta con `dateKey()`, il giorno della finestra.
 4. Se è lo stesso giorno, restituisce solo l'ora (`time`, es. `09:30`).
-5. Altrimenti restituisce l'ora seguita da `(+1)` (es. `07:00 (+1)`).
+5. Se è un giorno precedente, restituisce l'ora seguita da `(-1)`;
+   altrimenti l'ora seguita da `(+1)`. Le date si confrontano come testi,
+   come gli orari (vedi 5.9, Note).
 
 **Note**
-- Solo la fine può cadere nel giorno dopo: l'inizio è sempre nel giorno
-  della finestra (vedi 5.16).
+- `(+1)` compare sulla fine di un'attività che oltrepassa la mezzanotte, vista
+  nel giorno in cui inizia. `(-1)` compare sul suo inizio, vista nel giorno
+  in cui finisce (vedi `events`).
 - La mezzanotte appare come `00:00 (+1)`, coerente con come si inserisce
   (fine `00:00`).
+- Accessibilità: lo screen reader legge `(-1)` e `(+1)` come "meno uno" e "più uno".
+  È comprensibile, ma in futuro si potrà sostituire con un testo tradotto.
 
 ### 5.6 — startNew()
 
@@ -394,11 +404,14 @@ save(): void
     return;
   }
 
-  const current = this.storage.getDay(this.dateKey());
+  const day = this.startDay();
+  const current = this.storage.getDay(day);
   const timeline = [...(current?.timeline ?? [])];
+  const previous = this.storage.getDay(this.shiftDay(day, -1))?.timeline ?? [];
+  const next = this.storage.getDay(this.shiftDay(day, 1))?.timeline ?? [];
   const editing = this.editingEvent();
   const event = this.toEvent(value);
-  const overlaps = timeline.some(existing => existing !== editing
+  const overlaps = [...previous, ...timeline, ...next].some(existing => existing !== editing
     && event.start < existing.end
     && event.end > existing.start);
   if (overlaps) {
@@ -418,8 +431,8 @@ save(): void
   }
 
   this.storage.saveDay({
-    id: current?.id ?? `day-${this.dateKey()}`,
-    date: this.dateKey(),
+    id: current?.id ?? `day-${day}`,
+    date: day,
     timeline: timeline.sort((a, b) => a.start.localeCompare(b.start)),
     extra: current?.extra ?? [],
   });
@@ -450,15 +463,22 @@ l'errore e si ferma, senza salvare nulla.
    di intervallo non valido.
 3. **Sovrapposizioni**
    `toEvent` (vedi 5.15) costruisce subito l'attività, con inizio e fine completi
-   di data. `current` è il giorno salvato; `timeline` è una **copia** delle sue attività.
-   `overlaps` è vero se un'attività esistente (diversa da quella in modifica)
-   si sovrappone a quella nuova. In quel caso si mostra il messaggio di intervallo.
+   di data. `day` è il giorno in cui l'attività è (o sarà) salvata, cioè `startDay()`:
+   il giorno della finestra per un'attività nuova, il suo giorno di inizio per una
+   in modifica. `current` è quel giorno salvato; `timeline` è una **copia** delle sue attività.
+   `previous` e `next` sono le attività del giorno precedente e di quello successivo
+   (lista vuota se il giorno non esiste): servono per le attività che oltrepassano
+   la mezzanotte. Bastano i due giorni vicini, perché un'attività dura meno di 24 ore.
+   `overlaps` è vero se un'attività esistente dei tre giorni (diversa da quella in
+   modifica) si sovrappone a quella nuova. Il confronto funziona anche tra giorni
+   diversi perché inizio e fine sono stringhe ISO complete di data (es. `2026-11-18T22:00`).
+   In quel caso si mostra il messaggio di intervallo.
 4. **Nuova o modificata**
    - In modifica: si cerca la posizione dell'attività originale e la si sostituisce.
      Se non c'è più, si annulla la modifica senza salvare.
    - Altrimenti: l'attività viene aggiunta in fondo.
 5. **Salvataggio**
-   `storage.saveDay` salva il giorno con le attività ordinate per orario di inizio.
+   `storage.saveDay` salva il giorno `day` con le attività ordinate per orario di inizio.
    Riusa l'`id` e gli `extra` del giorno, se esisteva già, altrimenti li crea.
 6. **Ripartenza e avviso**
    `resetForm()` (vedi 5.8) prepara il form per una nuova attività.
@@ -488,8 +508,11 @@ l'errore e si ferma, senza salvare nulla.
   `form.valueChanges` (5.1, punto 2), che altrimenti lo riporterebbe subito a `null`.
 - Se si salva due volte entro 5 secondi, il timer del primo salvataggio può
   nascondere in anticipo il secondo avviso. È un caso raro e volutamente non gestito.
-- Per ora le sovrapposizioni si controllano solo con le attività salvate
-  nello stesso giorno, non con quelle del giorno prima o del giorno dopo.
+- `day` va letto all'inizio, prima di `resetForm()`: il reset azzera `editingEvent`
+  e quindi `startDay()` tornerebbe al giorno della finestra.
+- Limite noto, volutamente non gestito: il form non permette di cambiare il giorno
+  di inizio. Se dal giorno di fine si modifica un'attività con orari che non
+  oltrepassano più la mezzanotte, l'attività si sposta tutta nel giorno di inizio.
 
 ### 5.10 — cancelDelete(click)
 
@@ -570,7 +593,7 @@ Dal template, con il pulsante "Elimina" di ogni attività dell'elenco
 confirmDelete(event: TimelineEvent): void
 {
   if (this.pendingDelete() !== event) return;
-  const current = this.storage.getDay(this.dateKey());
+  const current = this.storage.getDay(event.start.slice(0, 10));
   const index = current?.timeline.indexOf(event) ?? -1;
   if (current && index >= 0) {
     this.storage.saveDay({
@@ -594,7 +617,9 @@ Dal template, con il pulsante "Conferma" della conferma di eliminazione
 **Come funziona**
 1. Se `event` non è l'attività in attesa di conferma (`pendingDelete()`),
    il metodo si ferma.
-2. `current` è il giorno salvato; `index` è la posizione dell'attività nelle sue
+2. `current` è il giorno in cui l'attività è salvata, cioè il suo giorno di inizio
+   (`event.start.slice(0, 10)`): può essere il giorno prima, se l'attività
+   oltrepassa la mezzanotte. `index` è la posizione dell'attività nelle sue
    attività, oppure `-1` se non c'è (`?? -1` copre anche il caso di giorno assente).
 3. Se giorno e attività esistono, `storage.saveDay` salva il giorno:
    - `...current` copia tutti i suoi dati (id, data, extra);
@@ -738,9 +763,9 @@ prima del controllo delle sovrapposizioni.
 ```ts
 private toDateTimes(start: string, end: string): { start: string; end: string }
 {
-  const nextDay = formatDate(dayjs(this.date()).add(1, 'day').toDate());
-  const endDay = end > start ? this.dateKey() : nextDay;
-  return { start: `${this.dateKey()}T${start}`, end: `${endDay}T${end}` };
+  const day = this.startDay();
+  const endDay = end > start ? day : this.shiftDay(day, 1);
+  return { start: `${day}T${start}`, end: `${endDay}T${end}` };
 }
 ```
 
@@ -752,15 +777,45 @@ Trasforma i due orari del form (es. `23:00` e `07:00`) in date complete.
 Solo dall'interno del componente (`private`): da `toEvent()` (5.15).
 
 **Come funziona**
-1. `nextDay` è la data del giorno successivo (es. `2026-11-16`).
+1. `day` è il giorno di inizio, `startDay()`: il giorno della finestra per
+   un'attività nuova, il giorno di inizio originale per una in modifica.
 2. Se la fine è dopo l'inizio (`end > start`), la fine è nello stesso giorno;
-   altrimenti è nel giorno dopo.
+   altrimenti è nel giorno dopo, calcolato con `shiftDay(day, 1)` (vedi 5.17).
 3. Restituisce inizio e fine completi, es.
    `{ start: '2026-11-15T23:00', end: '2026-11-16T07:00' }`.
 
 **Note**
 - Gli orari si confrontano come testi: funziona perché `HH:mm` ha sempre
   due cifre (`"07:00" > "23:00"` è falso).
-- L'inizio è sempre nel giorno della finestra: un'attività si salva nel giorno
-  in cui inizia.
+- Un'attività si salva nel giorno in cui inizia. Per questo, modificando dal giorno
+  di fine un'attività iniziata il giorno prima, gli orari del form si leggono
+  rispetto al giorno di inizio (es. dal 19: `22:34` e `09:00` diventano
+  `2026-11-18T22:34` → `2026-11-19T09:00`).
 - Durata massima: meno di 24 ore. Inizio e fine uguali sono rifiutati da 5.14.
+
+### 5.17 — shiftDay(day, days)
+
+```ts
+private shiftDay(day: string, days: number): string
+{
+  return formatDate(dayjs(day).add(days, 'day').toDate());
+}
+```
+
+**Scopo**
+Restituisce la data spostata di un certo numero di giorni,
+es. `shiftDay('2026-11-19', -1)` → `'2026-11-18'`.
+
+**Quando viene chiamato**
+Solo dall'interno del componente (`private`): da `events` (giorno precedente),
+da `save()` (5.9, giorni vicini per le sovrapposizioni) e da `toDateTimes()`
+(5.16, giorno successivo).
+
+**Come funziona**
+1. `dayjs(day)` legge la data nel formato `YYYY-MM-DD`.
+2. `add(days, 'day')` la sposta: `days` negativo va indietro, positivo in avanti.
+3. `formatDate` la riporta al formato `YYYY-MM-DD` usato come chiave del giorno.
+
+**Note**
+- Raccoglie in un solo punto una formula che prima era ripetuta in più metodi.
+- `dayjs` gestisce da solo i cambi di mese e di anno (es. dal 1 gennaio al 31 dicembre).

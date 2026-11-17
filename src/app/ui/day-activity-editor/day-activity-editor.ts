@@ -42,7 +42,11 @@ export class DayActivityEditor {
   readonly closed = output<void>();
 
   readonly dateKey = computed(() => formatDate(this.date()));// indicizza la data di input del calendario con il metodo `formatDate`
-  readonly events = computed(() => this.storage.getDay(this.dateKey())?.timeline ?? []);// restituisce l'array di attività del giorno indicizzato
+  readonly events = computed(() => [
+    ...(this.storage.getDay(this.shiftDay(this.dateKey(), -1))?.timeline ?? [])
+      .filter(event => event.end > `${this.dateKey()}T00:00`),
+    ...(this.storage.getDay(this.dateKey())?.timeline ?? []),
+  ]);// restituisce le attività del giorno indicizzato, incluse quelle iniziate il giorno prima
 
   readonly types = Object.keys(EVENT_COLORS) as TimelineEvent['type'][];// ricava i tipi di attività legate al tempo
   readonly eventTitle = eventTitle; // ricava il titolo dell'attività
@@ -68,6 +72,7 @@ export class DayActivityEditor {
 
   readonly selectedType = signal<TimelineEvent['type']>('Work');
   readonly editingEvent = signal<TimelineEvent | null>(null);
+  readonly startDay = computed(() => this.editingEvent()?.start.slice(0, 10) ?? this.dateKey());
   readonly pendingDelete = signal<TimelineEvent | null>(null);
   readonly invalidFields = signal(false);
   readonly invalidInterval = signal(false);
@@ -122,7 +127,9 @@ export class DayActivityEditor {
   timeLabel(value: string): string
   {
     const time = value.slice(11, 16);
-    return value.slice(0, 10) === this.dateKey() ? time : `${time} (+1)`;
+    const day = value.slice(0, 10);
+    if (day === this.dateKey()) return time;
+    return day < this.dateKey() ? `${time} (-1)` : `${time} (+1)`;
   }
 
   // 5.6
@@ -187,11 +194,14 @@ export class DayActivityEditor {
       return;
     }
 
-    const current = this.storage.getDay(this.dateKey());
+    const day = this.startDay();
+    const current = this.storage.getDay(day);
     const timeline = [...(current?.timeline ?? [])];
+    const previous = this.storage.getDay(this.shiftDay(day, -1))?.timeline ?? [];
+    const next = this.storage.getDay(this.shiftDay(day, 1))?.timeline ?? [];
     const editing = this.editingEvent();
     const event = this.toEvent(value);
-    const overlaps = timeline.some(existing => existing !== editing
+    const overlaps = [...previous, ...timeline, ...next].some(existing => existing !== editing
       && event.start < existing.end
       && event.end > existing.start);
     if (overlaps) {
@@ -211,8 +221,8 @@ export class DayActivityEditor {
     }
 
     this.storage.saveDay({
-      id: current?.id ?? `day-${this.dateKey()}`,
-      date: this.dateKey(),
+      id: current?.id ?? `day-${day}`,
+      date: day,
       timeline: timeline.sort((a, b) => a.start.localeCompare(b.start)),
       extra: current?.extra ?? [],
     });
@@ -242,7 +252,7 @@ export class DayActivityEditor {
   confirmDelete(event: TimelineEvent): void
   {
     if (this.pendingDelete() !== event) return;
-    const current = this.storage.getDay(this.dateKey());
+    const current = this.storage.getDay(event.start.slice(0, 10));
     const index = current?.timeline.indexOf(event) ?? -1;
     if (current && index >= 0) {
       this.storage.saveDay({
@@ -293,8 +303,14 @@ export class DayActivityEditor {
   // 5.16
   private toDateTimes(start: string, end: string): { start: string; end: string }
   {
-    const nextDay = formatDate(dayjs(this.date()).add(1, 'day').toDate());
-    const endDay = end > start ? this.dateKey() : nextDay;
-    return { start: `${this.dateKey()}T${start}`, end: `${endDay}T${end}` };
+    const day = this.startDay();
+    const endDay = end > start ? day : this.shiftDay(day, 1);
+    return { start: `${day}T${start}`, end: `${endDay}T${end}` };
+  }
+
+  // 5.17
+  private shiftDay(day: string, days: number): string
+  {
+    return formatDate(dayjs(day).add(days, 'day').toDate());
   }
 }

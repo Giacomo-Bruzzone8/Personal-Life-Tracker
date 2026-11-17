@@ -72,7 +72,7 @@
     "Activity": "Attività",
     "Category": "Categoria",
     "RequiredFields": "Compila i campi obbligatori.",
-    "InvalidInterval": "Inserisci un intervallo valido all'interno della giornata selezionata.",
+    "InvalidInterval": "L'intervallo non è valido o si sovrappone a un'altra attività.",
     "Added": "Attività aggiunta.",
     "Updated": "Attività modificata."
   },

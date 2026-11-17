@@ -44,7 +44,8 @@ export class DayDetailComponent implements OnDestroy {
     const detail = this.detail();
     return detail?.date === formatDate(this.date()) ? detail : null;
   });
-  timeline = computed(() => this.dayDetail()?.timeline ?? []);
+  previousDay = computed(() => this.storage.getDay(formatDate(dayjs(this.date()).subtract(1, 'day').toDate())));
+  timeline = computed(() => [...(this.previousDay()?.timeline ?? []), ...(this.dayDetail()?.timeline ?? [])]);
   extra = computed(() => this.dayDetail()?.extra ?? []);
   activityPortions = computed(() => dayEventPortions(this.timeline(), this.date()));
   activities = computed(() => [...new Set(this.activityPortions().map(portion => portion.event))]);

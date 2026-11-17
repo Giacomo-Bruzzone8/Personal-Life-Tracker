@@ -41,9 +41,16 @@ export class CalendarComponent implements OnDestroy {
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
   year = computed(() => this.currentDate().year());
   month = computed(() => this.currentDate().month());
-  datesWithContent = computed(() => new Set(Object.values(this.storage.days())
-    .filter(day => day.timeline.length > 0 || day.extra.length > 0)
-    .map(day => day.date)));
+  datesWithContent = computed(() => {
+    const dates = new Set<string>();
+    for (const day of Object.values(this.storage.days())) {
+      if (day.timeline.length > 0 || day.extra.length > 0) dates.add(day.date);
+      for (const event of day.timeline) {
+        if (!event.end.endsWith('T00:00')) dates.add(event.end.slice(0, 10));
+      }
+    }
+    return dates;
+  });
 
   headerDescription = computed(() => {
     dayjs.locale(this.currentLang()); // Legge il signal per aggiornare il titolo al cambio di lingua.

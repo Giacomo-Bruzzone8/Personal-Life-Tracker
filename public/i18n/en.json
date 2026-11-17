@@ -72,7 +72,7 @@
     "Activity": "Activity",
     "Category": "Category",
     "RequiredFields": "Complete the required fields.",
-    "InvalidInterval": "Enter a valid time interval within the selected day.",
+    "InvalidInterval": "The interval is invalid or overlaps another activity.",
     "Added": "Activity added.",
     "Updated": "Activity updated."
   },
