@@ -25,11 +25,11 @@
       <div class="time-fields">
         <label>
           {{ 'DayActivityEditor.Start' | translate }}
-          <input type="datetime-local" formControlName="start" [min]="dayStart()" [max]="dayEnd()" aria-required="true">
+          <input type="time" formControlName="start" aria-required="true">
         </label>
         <label>
           {{ 'DayActivityEditor.End' | translate }}
-          <input type="datetime-local" formControlName="end" [min]="dayStart()" [max]="dayEnd()" aria-required="true">
+          <input type="time" formControlName="end" aria-required="true">
         </label>
       </div>
 

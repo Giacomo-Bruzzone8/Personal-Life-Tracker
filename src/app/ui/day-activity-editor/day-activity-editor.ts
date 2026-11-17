@@ -43,8 +43,6 @@ export class DayActivityEditor {
 
   readonly dateKey = computed(() => formatDate(this.date()));// indicizza la data di input del calendario con il metodo `formatDate`
   readonly events = computed(() => this.storage.getDay(this.dateKey())?.timeline ?? []);// restituisce l'array di attività del giorno indicizzato
-  readonly dayStart = computed(() => `${this.dateKey()}T00:00`);// mezzanotte iniziale del giorno scelto
-  readonly dayEnd = computed(() => `${formatDate(dayjs(this.date()).add(1, 'day').toDate())}T00:00`);// mezzanotte del giorno successivo
 
   readonly types = Object.keys(EVENT_COLORS) as TimelineEvent['type'][];// ricava i tipi di attività legate al tempo
   readonly eventTitle = eventTitle; // ricava il titolo dell'attività
@@ -123,7 +121,8 @@ export class DayActivityEditor {
   // 5.5
   timeLabel(value: string): string
   {
-    return value.slice(0, 10) === this.dateKey() ? value.slice(11, 16) : '24:00';
+    const time = value.slice(11, 16);
+    return value.slice(0, 10) === this.dateKey() ? time : `${time} (+1)`;
   }
 
   // 5.6
@@ -142,8 +141,8 @@ export class DayActivityEditor {
     this.editingEvent.set(event);
     this.form.patchValue({
       type: event.type,
-      start: event.start,
-      end: event.end,
+      start: event.start.slice(11, 16),
+      end: event.end.slice(11, 16),
       note: event.note ?? '',
     });
 
@@ -170,7 +169,7 @@ export class DayActivityEditor {
     this.editingEvent.set(null);
     this.invalidFields.set(false);
     this.invalidInterval.set(false);
-    this.form.reset({ start: `${this.dateKey()}T${dayjs().format('HH:mm')}` });
+    this.form.reset({ start: dayjs().format('HH:mm') });
   }
 
   // 5.9
@@ -191,15 +190,15 @@ export class DayActivityEditor {
     const current = this.storage.getDay(this.dateKey());
     const timeline = [...(current?.timeline ?? [])];
     const editing = this.editingEvent();
+    const event = this.toEvent(value);
     const overlaps = timeline.some(existing => existing !== editing
-      && value.start < existing.end
-      && value.end > existing.start);
+      && event.start < existing.end
+      && event.end > existing.start);
     if (overlaps) {
       this.invalidInterval.set(true);
       return;
     }
 
-    const event = this.toEvent(value);
     if (editing) {
       const index = timeline.indexOf(editing);
       if (index < 0) {
@@ -271,20 +270,14 @@ export class DayActivityEditor {
   // 5.14
   private isValidInterval(start: string, end: string): boolean
   {
-    const format = 'YYYY-MM-DDTHH:mm';
-    const startTime = dayjs(start);
-    const endTime = dayjs(end);
-    return startTime.isValid() && endTime.isValid()
-      && startTime.format(format) === start && endTime.format(format) === end
-      && !startTime.isBefore(this.dayStart()) && !endTime.isAfter(this.dayEnd())
-      && endTime.isAfter(startTime);
+    return start !== end;
   }
 
   // 5.15
   private toEvent(value: ActivityFormValue): TimelineEvent
   {
     const note = value.note.trim();
-    const interval = { start: value.start, end: value.end, ...(note ? { note } : {}) };
+    const interval = { ...this.toDateTimes(value.start, value.end), ...(note ? { note } : {}) };
     switch (value.type) {
       case 'Sleep': return { ...interval, type: 'Sleep', ...(value.dream.trim() ? { dream: value.dream.trim() } : {}) };
       case 'Work': return { ...interval, type: 'Work' };
@@ -295,5 +288,13 @@ export class DayActivityEditor {
       case 'CustomActivity': return { ...interval, type: 'CustomActivity', activity: value.activity.trim(), ...(value.category.trim() ? { category: value.category.trim() } : {}) };
       default: throw new Error('Unsupported activity type');
     }
+  }
+
+  // 5.16
+  private toDateTimes(start: string, end: string): { start: string; end: string }
+  {
+    const nextDay = formatDate(dayjs(this.date()).add(1, 'day').toDate());
+    const endDay = end > start ? this.dateKey() : nextDay;
+    return { start: `${this.dateKey()}T${start}`, end: `${endDay}T${end}` };
   }
 }

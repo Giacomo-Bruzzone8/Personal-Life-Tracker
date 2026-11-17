@@ -7,8 +7,9 @@ Permette di aggiungere, modificare ed eliminare le attività legate al tempo di 
 (Sonno, Lavoro, Studio, Lettura, Sport, Tempo libero, Attività personalizzata).
 Ogni attività occupa un intervallo orario (inizio e fine): è questo intervallo che permette
 di disegnare sulla timeline circolare il tempo occupato nella giornata.
-Prima di salvare controlla i campi obbligatori del tipo scelto, che l'orario
-stia dentro il giorno e che l'attività non si sovrapponga ad altre.
+Prima di salvare controlla i campi obbligatori del tipo scelto, che inizio e fine
+siano diversi e che l'attività non si sovrapponga ad altre.
+Un'attività può proseguire oltre la mezzanotte: in quel caso finisce il giorno dopo.
 I dati vengono letti e salvati tramite `StorageService`.
 È pensata per essere usabile anche da tastiera e con screen reader.
 
@@ -47,7 +48,7 @@ I dati vengono letti e salvati tramite `StorageService`.
 ### Date — `dayjs`
 | Import | A cosa serve qui |
 |---|---|
-| `dayjs` | Calcola il giorno successivo, legge l'ora attuale e controlla la validità degli orari. |
+| `dayjs` | Legge l'ora attuale (`resetForm`) e calcola la data del giorno successivo (`toDateTimes`). |
 
 ### File del progetto
 | Import | Da dove | A cosa serve qui |
@@ -221,13 +222,14 @@ In tre modi:
 ```ts
 timeLabel(value: string): string
 {
-  return value.slice(0, 10) === this.dateKey() ? value.slice(11, 16) : '24:00';
+  const time = value.slice(11, 16);
+  return value.slice(0, 10) === this.dateKey() ? time : `${time} (+1)`;
 }
 ```
 
 **Scopo**
 Trasforma l'orario salvato di un'attività nel testo da mostrare nell'elenco
-(es. `09:30`). La mezzanotte del giorno dopo viene mostrata come `24:00`.
+(es. `09:30`). Se l'orario cade nel giorno dopo, aggiunge `(+1)` (es. `07:00 (+1)`).
 
 **Quando viene chiamato**
 Dal template, nell'elenco delle attività registrate:
@@ -235,16 +237,17 @@ Dal template, nell'elenco delle attività registrate:
 
 **Come funziona**
 1. `value` ha il formato `YYYY-MM-DDTHH:mm`, ad esempio `2026-11-09T09:30`.
-2. `value.slice(0, 10)` prende la parte della data (`2026-11-09`)
+2. `time = value.slice(11, 16)` prende l'ora (`09:30`).
+3. `value.slice(0, 10)` prende la parte della data (`2026-11-09`)
    e la confronta con `dateKey()`, il giorno della finestra.
-3. Se è lo stesso giorno, `value.slice(11, 16)` restituisce solo l'ora (`09:30`).
-4. Altrimenti restituisce `'24:00'`.
+4. Se è lo stesso giorno, restituisce solo l'ora (`time`, es. `09:30`).
+5. Altrimenti restituisce l'ora seguita da `(+1)` (es. `07:00 (+1)`).
 
 **Note**
-- Un'attività può finire alla mezzanotte del giorno dopo (es. `2026-11-10T00:00`).
-  Mostrarla come `00:00` sarebbe confuso (`22:00–00:00`), per questo diventa `24:00`.
-- Il caso "altro giorno" può essere solo quella mezzanotte, perché
-  `isValidInterval` non accetta orari oltre `dayEnd`.
+- Solo la fine può cadere nel giorno dopo: l'inizio è sempre nel giorno
+  della finestra (vedi 5.16).
+- La mezzanotte appare come `00:00 (+1)`, coerente con come si inserisce
+  (fine `00:00`).
 
 ### 5.6 — startNew()
 
@@ -284,8 +287,8 @@ edit(event: TimelineEvent): void
   this.editingEvent.set(event);
   this.form.patchValue({
     type: event.type,
-    start: event.start,
-    end: event.end,
+    start: event.start.slice(11, 16),
+    end: event.end.slice(11, 16),
     note: event.note ?? '',
   });
 
@@ -322,6 +325,8 @@ Dal template, con il pulsante "Modifica" di ogni attività dell'elenco
 4. `editingEvent.set(event)` ricorda quale attività sostituire al salvataggio.
    Viene dopo `resetForm()`, che altrimenti lo riporterebbe a `null`.
 5. Il primo `patchValue` carica i campi comuni a tutti i tipi: tipo, inizio, fine e nota.
+   Di inizio e fine carica solo l'ora (`slice(11, 16)`, es. `23:00`), perché i campi
+   del form sono di tipo `time`; la data viene ricostruita al salvataggio (vedi 5.16).
    Se la nota manca (`?? ''`), il campo resta vuoto.
 6. Lo `switch` carica i campi specifici del tipo (es. libro e autore per `Reading`).
    `Work` non ha campi specifici.
@@ -340,7 +345,7 @@ resetForm(): void
   this.editingEvent.set(null);
   this.invalidFields.set(false);
   this.invalidInterval.set(false);
-  this.form.reset({ start: `${this.dateKey()}T${dayjs().format('HH:mm')}` });
+  this.form.reset({ start: dayjs().format('HH:mm') });
 }
 ```
 
@@ -361,8 +366,7 @@ Da diversi punti del componente:
    quindi il prossimo salvataggio creerà un'attività nuova.
 2. `invalidFields` e `invalidInterval` tornano a `false`: i messaggi di errore spariscono.
 3. `form.reset({ start: ... })` reimposta tutti i campi:
-   - `start` diventa il giorno della finestra con l'ora attuale
-     (es. `2026-11-09T15:42`), così l'utente parte da un orario sensato;
+   - `start` diventa l'ora attuale (es. `15:42`), così l'utente parte da un orario sensato;
    - tutti gli altri campi, non indicati, tornano al valore iniziale definito
      nel `form` (`Work` per `type`, vuoto per gli altri). Succede perché i
      controlli sono `nonNullable`.
@@ -393,15 +397,15 @@ save(): void
   const current = this.storage.getDay(this.dateKey());
   const timeline = [...(current?.timeline ?? [])];
   const editing = this.editingEvent();
+  const event = this.toEvent(value);
   const overlaps = timeline.some(existing => existing !== editing
-    && value.start < existing.end
-    && value.end > existing.start);
+    && event.start < existing.end
+    && event.end > existing.start);
   if (overlaps) {
     this.invalidInterval.set(true);
     return;
   }
 
-  const event = this.toEvent(value);
   if (editing) {
     const index = timeline.indexOf(editing);
     if (index < 0) {
@@ -440,17 +444,16 @@ l'errore e si ferma, senza salvare nulla.
    Se il form è invalido (es. un campo obbligatorio vuoto), `markAllAsTouched()`
    segna tutti i campi come "toccati" e `invalidFields` mostra il messaggio
    "campi obbligatori".
-2. **Orari nel giorno**
+2. **Orari**
    `getRawValue()` legge i valori del form. `isValidInterval` (vedi 5.14) controlla
-   che inizio e fine siano validi e dentro il giorno; se no, `invalidInterval`
-   mostra il messaggio di intervallo non valido.
+   che inizio e fine siano diversi; se no, `invalidInterval` mostra il messaggio
+   di intervallo non valido.
 3. **Sovrapposizioni**
-   `current` è il giorno salvato; `timeline` è una **copia** delle sue attività.
+   `toEvent` (vedi 5.15) costruisce subito l'attività, con inizio e fine completi
+   di data. `current` è il giorno salvato; `timeline` è una **copia** delle sue attività.
    `overlaps` è vero se un'attività esistente (diversa da quella in modifica)
-   si sovrappone a quella nuova: inizia prima che la nuova finisca e finisce
-   dopo che la nuova inizia. In quel caso si mostra lo stesso messaggio di intervallo.
+   si sovrappone a quella nuova. In quel caso si mostra il messaggio di intervallo.
 4. **Nuova o modificata**
-   `toEvent` (vedi 5.15) costruisce l'attività dai valori del form.
    - In modifica: si cerca la posizione dell'attività originale e la si sostituisce.
      Se non c'è più, si annulla la modifica senza salvare.
    - Altrimenti: l'attività viene aggiunta in fondo.
@@ -466,7 +469,7 @@ l'errore e si ferma, senza salvare nulla.
 
 **Note**
 - Attività consecutive sono ammesse: se una finisce alle `10:00` e l'altra inizia
-  alle `10:00`, il confronto `value.start < existing.end` è falso e non c'è sovrapposizione.
+  alle `10:00`, il confronto `event.start < existing.end` è falso e non c'è sovrapposizione.
 - Gli orari si confrontano come testi (`<`, `>`, `localeCompare`). Funziona perché
   il formato `YYYY-MM-DDTHH:mm` mette prima le parti più importanti: l'ordine
   alfabetico coincide con l'ordine nel tempo.
@@ -485,6 +488,8 @@ l'errore e si ferma, senza salvare nulla.
   `form.valueChanges` (5.1, punto 2), che altrimenti lo riporterebbe subito a `null`.
 - Se si salva due volte entro 5 secondi, il timer del primo salvataggio può
   nascondere in anticipo il secondo avviso. È un caso raro e volutamente non gestito.
+- Per ora le sovrapposizioni si controllano solo con le attività salvate
+  nello stesso giorno, non con quelle del giorno prima o del giorno dopo.
 
 ### 5.10 — cancelDelete(click)
 
@@ -657,43 +662,26 @@ il tipo nel form (tendina, `resetForm` o `edit`).
 ```ts
 private isValidInterval(start: string, end: string): boolean
 {
-  const format = 'YYYY-MM-DDTHH:mm';
-  const startTime = dayjs(start);
-  const endTime = dayjs(end);
-  return startTime.isValid() && endTime.isValid()
-    && startTime.format(format) === start && endTime.format(format) === end
-    && !startTime.isBefore(this.dayStart()) && !endTime.isAfter(this.dayEnd())
-    && endTime.isAfter(startTime);
+  return start !== end;
 }
 ```
 
 **Scopo**
-Controlla che inizio e fine di un'attività siano orari validi, dentro il giorno
-della finestra (fino alla mezzanotte successiva compresa), e che la fine venga dopo l'inizio.
+Controlla che l'intervallo inserito sia valido: inizio e fine devono essere diversi.
 
 **Quando viene chiamato**
 Solo dall'interno del componente (`private`): da `save()` (5.9, punto 2),
 dopo il controllo dei campi obbligatori.
 
 **Come funziona**
-Restituisce `true` solo se tutte e quattro le condizioni sono vere:
-1. **Date leggibili**: `dayjs(...)` interpreta i due testi e `isValid()`
-   controlla che siano date vere.
-2. **Formato esatto**: riconvertendo la data in testo con `format` si deve
-   ottenere esattamente il testo di partenza (es. `2026-11-09T09:30`).
-3. **Dentro il giorno**: l'inizio non è prima di `dayStart()` (mezzanotte del giorno)
-   e la fine non è dopo `dayEnd()` (mezzanotte del giorno dopo).
-4. **Ordine corretto**: la fine è strettamente dopo l'inizio, quindi niente
-   attività di durata zero.
+Restituisce `true` se `start` ed `end` sono diversi.
 
 **Note**
-- Il controllo del formato (punto 2) serve perché dayjs "aggiusta" le date impossibili:
-  `2026-02-31` diventerebbe il 3 marzo. Confrontando con il testo originale
-  la differenza emerge e l'orario viene rifiutato.
-- Il formato fisso garantisce anche che i confronti tra testi in `save()` (5.9)
-  e `timeLabel()` (5.5) funzionino correttamente.
-- La mezzanotte del giorno dopo è accettata come fine: è il caso che `timeLabel`
-  mostra come `24:00`.
+- Gli altri controlli li fanno già altri: il formato `HH:mm` è garantito
+  dai campi `type="time"`, un campo vuoto è bloccato da `Validators.required`.
+- Qualsiasi coppia di orari diversi è valida: se la fine viene prima
+  dell'inizio, l'attività finisce il giorno dopo (vedi 5.16).
+- Il metodo resta separato per leggibilità e per ospitare eventuali regole future.
 
 ### 5.15 — toEvent(value)
 
@@ -701,7 +689,7 @@ Restituisce `true` solo se tutte e quattro le condizioni sono vere:
 private toEvent(value: ActivityFormValue): TimelineEvent
 {
   const note = value.note.trim();
-  const interval = { start: value.start, end: value.end, ...(note ? { note } : {}) };
+  const interval = { ...this.toDateTimes(value.start, value.end), ...(note ? { note } : {}) };
   switch (value.type) {
     case 'Sleep': return { ...interval, type: 'Sleep', ...(value.dream.trim() ? { dream: value.dream.trim() } : {}) };
     case 'Work': return { ...interval, type: 'Work' };
@@ -720,13 +708,14 @@ Trasforma i valori del form nell'oggetto attività previsto dal modello
 `TimelineEvent`, con solo i campi del tipo scelto.
 
 **Quando viene chiamato**
-Solo dall'interno del componente (`private`): da `save()` (5.9, punto 4),
-dopo che tutti i controlli sono passati.
+Solo dall'interno del componente (`private`): da `save()` (5.9, punto 3),
+prima del controllo delle sovrapposizioni.
 
 **Come funziona**
 1. `value` contiene tutti i campi del form (`ActivityFormValue`), anche quelli
    degli altri tipi, che sono vuoti.
-2. `interval` raccoglie i dati comuni: inizio, fine e, se non vuota, la nota.
+2. `interval` raccoglie i dati comuni: inizio e fine completi di data, calcolati
+   da `toDateTimes` (vedi 5.16), e, se non vuota, la nota.
 3. Lo `switch` sceglie il tipo e costruisce l'oggetto finale:
    - `...interval` copia i dati comuni;
    - `type` indica il tipo di attività;
@@ -743,3 +732,35 @@ dopo che tutti i controlli sono passati.
   arrivi un tipo non previsto.
 - In vista di un database: l'oggetto creato è sempre nuovo. Quando le attività
   avranno un `id`, in modifica bisognerà conservare l'`id` dell'attività originale.
+
+### 5.16 — toDateTimes(start, end)
+
+```ts
+private toDateTimes(start: string, end: string): { start: string; end: string }
+{
+  const nextDay = formatDate(dayjs(this.date()).add(1, 'day').toDate());
+  const endDay = end > start ? this.dateKey() : nextDay;
+  return { start: `${this.dateKey()}T${start}`, end: `${endDay}T${end}` };
+}
+```
+
+**Scopo**
+Trasforma i due orari del form (es. `23:00` e `07:00`) in date complete.
+È l'unico punto in cui si decide se un'attività finisce il giorno dopo.
+
+**Quando viene chiamato**
+Solo dall'interno del componente (`private`): da `toEvent()` (5.15).
+
+**Come funziona**
+1. `nextDay` è la data del giorno successivo (es. `2026-11-16`).
+2. Se la fine è dopo l'inizio (`end > start`), la fine è nello stesso giorno;
+   altrimenti è nel giorno dopo.
+3. Restituisce inizio e fine completi, es.
+   `{ start: '2026-11-15T23:00', end: '2026-11-16T07:00' }`.
+
+**Note**
+- Gli orari si confrontano come testi: funziona perché `HH:mm` ha sempre
+  due cifre (`"07:00" > "23:00"` è falso).
+- L'inizio è sempre nel giorno della finestra: un'attività si salva nel giorno
+  in cui inizia.
+- Durata massima: meno di 24 ore. Inizio e fine uguali sono rifiutati da 5.14.
