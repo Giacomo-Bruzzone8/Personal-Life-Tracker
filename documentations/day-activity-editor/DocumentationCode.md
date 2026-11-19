@@ -811,6 +811,10 @@ Solo dall'interno del componente (`private`): da `toEvent()` (5.15).
   rispetto al giorno di inizio (es. dal 19: `22:34` e `09:00` diventano
   `2026-11-18T22:34` → `2026-11-19T09:00`).
 - Durata massima: meno di 24 ore. Inizio e fine uguali sono rifiutati da 5.14.
+- I campi `type="time"` accettano ore da 00 a 23: non si può scrivere 24:00.
+  Per questo l'intestazione della finestra mostra, sotto la data, il messaggio
+  `DayActivityEditor.MidnightHint`: per iniziare un'attività alle 24:00 si apre
+  il giorno successivo e la si inserisce con inizio alle 00:00.
 
 ### 5.17 — shiftDay(day, days)
 

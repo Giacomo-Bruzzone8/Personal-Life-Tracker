@@ -77,7 +77,8 @@
     "Updated": "Attività modificata.",
     "Time": "{{time}}",
     "PreviousDayTime": "{{time}} (Giorno precedente)",
-    "NextDayTime": "{{time}} (Giorno successivo)"
+    "NextDayTime": "{{time}} (Giorno successivo)",
+    "MidnightHint": "Per far iniziare un'attività alle 24:00, apri il giorno successivo e inseriscila con inizio alle 00:00."
   },
   "EventTypes": {
     "Sleep": "Sonno",

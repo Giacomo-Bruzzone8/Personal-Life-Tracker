@@ -77,7 +77,8 @@
     "Updated": "Activity updated.",
     "Time": "{{time}}",
     "PreviousDayTime": "{{time}} (Previous day)",
-    "NextDayTime": "{{time}} (Next day)"
+    "NextDayTime": "{{time}} (Next day)",
+    "MidnightHint": "To start an activity at midnight (24:00), open the next day and enter it with a start time of 00:00."
   },
   "EventTypes": {
     "Sleep": "Sleep",
