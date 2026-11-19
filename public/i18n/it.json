@@ -74,7 +74,10 @@
     "RequiredFields": "Compila i campi obbligatori.",
     "InvalidInterval": "L'intervallo non è valido o si sovrappone a un'altra attività.",
     "Added": "Attività aggiunta.",
-    "Updated": "Attività modificata."
+    "Updated": "Attività modificata.",
+    "Time": "{{time}}",
+    "PreviousDayTime": "{{time}} (Giorno precedente)",
+    "NextDayTime": "{{time}} (Giorno successivo)"
   },
   "EventTypes": {
     "Sleep": "Sonno",

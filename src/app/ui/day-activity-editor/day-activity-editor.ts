@@ -124,12 +124,12 @@ export class DayActivityEditor {
   }
 
   // 5.5
-  timeLabel(value: string): string
+  timeLabel(value: string): { key: string; time: string }
   {
     const time = value.slice(11, 16);
     const day = value.slice(0, 10);
-    if (day === this.dateKey()) return time;
-    return day < this.dateKey() ? `${time} (-1)` : `${time} (+1)`;
+    if (day === this.dateKey()) return { key: 'DayActivityEditor.Time', time };
+    return { key: day < this.dateKey() ? 'DayActivityEditor.PreviousDayTime' : 'DayActivityEditor.NextDayTime', time };
   }
 
   // 5.6
@@ -204,7 +204,7 @@ export class DayActivityEditor {
     const overlaps = [...previous, ...timeline, ...next].some(existing => existing !== editing
       && event.start < existing.end
       && event.end > existing.start);
-    if (overlaps) {
+    if (overlaps || event.end <= `${this.dateKey()}T00:00`) {
       this.invalidInterval.set(true);
       return;
     }
@@ -228,7 +228,7 @@ export class DayActivityEditor {
     });
     this.resetForm();
     this.savedMessage.set(editing ? 'DayActivityEditor.Updated' : 'DayActivityEditor.Added');
-    setTimeout(() => this.savedMessage.set(null), 5000);
+    setTimeout(() => this.savedMessage.set(null), 2500);
   }
 
   // 5.10

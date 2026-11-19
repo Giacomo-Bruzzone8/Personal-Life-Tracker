@@ -222,42 +222,57 @@ In tre modi:
 ### 5.5 — timeLabel(value)
 
 ```ts
-timeLabel(value: string): string
+timeLabel(value: string): { key: string; time: string }
 {
   const time = value.slice(11, 16);
   const day = value.slice(0, 10);
-  if (day === this.dateKey()) return time;
-  return day < this.dateKey() ? `${time} (-1)` : `${time} (+1)`;
+  if (day === this.dateKey()) return { key: 'DayActivityEditor.Time', time };
+  return { key: day < this.dateKey() ? 'DayActivityEditor.PreviousDayTime' : 'DayActivityEditor.NextDayTime', time };
 }
 ```
 
 **Scopo**
-Trasforma l'orario salvato di un'attività nel testo da mostrare nell'elenco
-(es. `09:30`). Se l'orario cade nel giorno dopo aggiunge `(+1)` (es. `07:00 (+1)`),
-se cade nel giorno prima aggiunge `(-1)` (es. `22:34 (-1)`).
+Prepara l'orario di un'attività da mostrare nell'elenco: restituisce l'ora
+(es. `09:30`) e la chiave di traduzione da usare, che indica se l'orario cade
+nel giorno della finestra, in quello precedente o in quello successivo.
 
 **Quando viene chiamato**
 Dal template, nell'elenco delle attività registrate:
-`{{ timeLabel(event.start) }}–{{ timeLabel(event.end) }}`.
+```html
+@let start = timeLabel(event.start);
+@let end = timeLabel(event.end);
+<span>{{ start.key | translate: start }}–{{ end.key | translate: end }}</span>
+```
+`@let` crea una variabile locale nel template, così il metodo viene chiamato
+una sola volta per orario. `translate: start` passa l'oggetto come parametri
+della traduzione: `time` riempie il segnaposto `{{time}}`, `key` viene ignorata.
 
 **Come funziona**
 1. `value` ha il formato `YYYY-MM-DDTHH:mm`, ad esempio `2026-11-09T09:30`.
 2. `time = value.slice(11, 16)` prende l'ora (`09:30`).
 3. `day = value.slice(0, 10)` prende la parte della data (`2026-11-09`)
    e la confronta con `dateKey()`, il giorno della finestra.
-4. Se è lo stesso giorno, restituisce solo l'ora (`time`, es. `09:30`).
-5. Se è un giorno precedente, restituisce l'ora seguita da `(-1)`;
-   altrimenti l'ora seguita da `(+1)`. Le date si confrontano come testi,
+4. Se è lo stesso giorno, restituisce la chiave `DayActivityEditor.Time`
+   (testo: solo l'ora, es. `09:30`).
+5. Se è un giorno precedente restituisce `DayActivityEditor.PreviousDayTime`
+   (es. `22:34 (Giorno precedente)`), altrimenti `DayActivityEditor.NextDayTime`
+   (es. `07:00 (Giorno successivo)`). Le date si confrontano come testi,
    come gli orari (vedi 5.9, Note).
 
 **Note**
-- `(+1)` compare sulla fine di un'attività che oltrepassa la mezzanotte, vista
-  nel giorno in cui inizia. `(-1)` compare sul suo inizio, vista nel giorno
-  in cui finisce (vedi `events`).
-- La mezzanotte appare come `00:00 (+1)`, coerente con come si inserisce
-  (fine `00:00`).
-- Accessibilità: lo screen reader legge `(-1)` e `(+1)` come "meno uno" e "più uno".
-  È comprensibile, ma in futuro si potrà sostituire con un testo tradotto.
+- "Giorno successivo" compare sulla fine di un'attività che oltrepassa la mezzanotte,
+  vista nel giorno in cui inizia. "Giorno precedente" compare sul suo inizio, vista
+  nel giorno in cui finisce (vedi `events`).
+- La mezzanotte appare come `00:00 (Giorno successivo)`, coerente con come si
+  inserisce (fine `00:00`).
+- Il testo sta solo nei file di traduzione: il metodo sceglie la chiave, il pipe
+  `translate` scrive il testo e lo aggiorna da solo al cambio di lingua.
+- La chiave `Time` contiene solo `{{time}}`: serve perché il template tratti
+  i tre casi allo stesso modo, senza un `@if`.
+- Le traduzioni restano generiche ("giorno precedente", non "ieri"): il riferimento
+  è il giorno aperto nella finestra, che non è necessariamente oggi.
+- Accessibilità: lo screen reader legge un testo chiaro (es. "22:34 giorno precedente")
+  invece di simboli come `(-1)`.
 
 ### 5.6 — startNew()
 
@@ -414,7 +429,7 @@ save(): void
   const overlaps = [...previous, ...timeline, ...next].some(existing => existing !== editing
     && event.start < existing.end
     && event.end > existing.start);
-  if (overlaps) {
+  if (overlaps || event.end <= `${this.dateKey()}T00:00`) {
     this.invalidInterval.set(true);
     return;
   }
@@ -438,7 +453,7 @@ save(): void
   });
   this.resetForm();
   this.savedMessage.set(editing ? 'DayActivityEditor.Updated' : 'DayActivityEditor.Added');
-  setTimeout(() => this.savedMessage.set(null), 5000);
+  setTimeout(() => this.savedMessage.set(null), 2500);
 }
 ```
 
@@ -473,6 +488,8 @@ l'errore e si ferma, senza salvare nulla.
    modifica) si sovrappone a quella nuova. Il confronto funziona anche tra giorni
    diversi perché inizio e fine sono stringhe ISO complete di data (es. `2026-11-18T22:00`).
    In quel caso si mostra il messaggio di intervallo.
+   Lo stesso messaggio compare se l'attività non toccherebbe più il giorno della
+   finestra (vedi Note).
 4. **Nuova o modificata**
    - In modifica: si cerca la posizione dell'attività originale e la si sostituisce.
      Se non c'è più, si annulla la modifica senza salvare.
@@ -484,8 +501,8 @@ l'errore e si ferma, senza salvare nulla.
    `resetForm()` (vedi 5.8) prepara il form per una nuova attività.
    Subito dopo, `savedMessage` riceve la chiave del messaggio da mostrare:
    `DayActivityEditor.Updated` se era una modifica, `DayActivityEditor.Added`
-   se era una nuova attività. `setTimeout` lo riporta a `null` dopo 5 secondi
-   (5000 millisecondi), così l'avviso sparisce da solo.
+   se era una nuova attività. `setTimeout` lo riporta a `null` dopo 2,5 secondi
+   (2500 millisecondi), così l'avviso sparisce da solo.
 
 **Note**
 - Attività consecutive sono ammesse: se una finisce alle `10:00` e l'altra inizia
@@ -506,13 +523,15 @@ l'errore e si ferma, senza salvare nulla.
   `display: none`, che toglierebbe lo span anche allo screen reader.
 - `savedMessage` va impostato **dopo** `resetForm()`: il reset fa scattare
   `form.valueChanges` (5.1, punto 2), che altrimenti lo riporterebbe subito a `null`.
-- Se si salva due volte entro 5 secondi, il timer del primo salvataggio può
-  nascondere in anticipo il secondo avviso. È un caso raro e volutamente non gestito.
 - `day` va letto all'inizio, prima di `resetForm()`: il reset azzera `editingEvent`
   e quindi `startDay()` tornerebbe al giorno della finestra.
-- Limite noto, volutamente non gestito: il form non permette di cambiare il giorno
-  di inizio. Se dal giorno di fine si modifica un'attività con orari che non
-  oltrepassano più la mezzanotte, l'attività si sposta tutta nel giorno di inizio.
+- Il form non permette di cambiare il giorno di inizio. Per questo un'attività
+  modificata deve restare visibile nel giorno della finestra: se la nuova fine
+  non supera la mezzanotte di `dateKey()` (`event.end <= ...T00:00`), si mostra
+  il messaggio di intervallo. Senza questo controllo, modificando dal giorno di
+  fine un'attività iniziata il giorno prima con orari che non oltrepassano più
+  la mezzanotte, l'attività si sposterebbe tutta nel giorno precedente e
+  sparirebbe dalla finestra. Per spostarla basta eliminarla e ricrearla.
 
 ### 5.10 — cancelDelete(click)
 

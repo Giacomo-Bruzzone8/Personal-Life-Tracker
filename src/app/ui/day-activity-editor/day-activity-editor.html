@@ -82,7 +82,9 @@
             <li [style.border-left-color]="eventColors[event.type]">
               <div class="activity-summary">
                 <strong>{{ 'EventTypes.' + event.type | translate }}</strong>
-                <span>{{ timeLabel(event.start) }}–{{ timeLabel(event.end) }}</span>
+                @let start = timeLabel(event.start);
+                @let end = timeLabel(event.end);
+                <span>{{ start.key | translate: start }}–{{ end.key | translate: end }}</span>
                 @if (eventTitle(event)) { <span>{{ eventTitle(event) }}</span> }
               </div>
               @if (pendingDelete() === event) {

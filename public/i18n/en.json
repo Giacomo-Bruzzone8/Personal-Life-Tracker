@@ -74,7 +74,10 @@
     "RequiredFields": "Complete the required fields.",
     "InvalidInterval": "The interval is invalid or overlaps another activity.",
     "Added": "Activity added.",
-    "Updated": "Activity updated."
+    "Updated": "Activity updated.",
+    "Time": "{{time}}",
+    "PreviousDayTime": "{{time}} (Previous day)",
+    "NextDayTime": "{{time}} (Next day)"
   },
   "EventTypes": {
     "Sleep": "Sleep",
