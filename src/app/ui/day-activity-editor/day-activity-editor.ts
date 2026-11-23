@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { TranslateModule } from '@ngx-translate/core';
 import dayjs from 'dayjs';
 import { formatDate } from '../../functions/date-utils';
+import { eventsOnDay } from '../../functions/day-events';
 import { TimelineEvent } from '../../models/calendar-event.model';
 import { EVENT_COLORS, eventTitle } from '../../models/event-presentation';
 import { StorageService } from '../../services/storage.service';
@@ -42,11 +43,7 @@ export class DayActivityEditor {
   readonly closed = output<void>();
 
   readonly dateKey = computed(() => formatDate(this.date()));// indicizza la data di input del calendario con il metodo `formatDate`
-  readonly events = computed(() => [
-    ...(this.storage.getDay(this.shiftDay(this.dateKey(), -1))?.timeline ?? [])
-      .filter(event => event.end > `${this.dateKey()}T00:00`),
-    ...(this.storage.getDay(this.dateKey())?.timeline ?? []),
-  ]);// restituisce le attività del giorno indicizzato, incluse quelle iniziate il giorno prima
+  readonly events = computed(() => eventsOnDay(this.storage.days(), this.dateKey()));// restituisce le attività del giorno indicizzato, incluse quelle iniziate il giorno prima
 
   readonly types = Object.keys(EVENT_COLORS) as TimelineEvent['type'][];// ricava i tipi di attività legate al tempo
   readonly eventTitle = eventTitle; // ricava il titolo dell'attività

@@ -8,6 +8,7 @@ import 'dayjs/locale/it';
 import 'dayjs/locale/en';
 import { Subject, takeUntil } from 'rxjs';
 import { formatDate } from '../../functions/date-utils';
+import { eventsOnDay } from '../../functions/day-events';
 import { CalendarDay } from '../../models/calendar-day.model';
 import { StorageService } from '../../services/storage.service';
 import { DayActivityEditor } from '../day-activity-editor/day-activity-editor';
@@ -41,16 +42,6 @@ export class CalendarComponent implements OnDestroy {
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
   year = computed(() => this.currentDate().year());
   month = computed(() => this.currentDate().month());
-  datesWithContent = computed(() => {
-    const dates = new Set<string>();
-    for (const day of Object.values(this.storage.days())) {
-      if (day.timeline.length > 0 || day.extra.length > 0) dates.add(day.date);
-      for (const event of day.timeline) {
-        if (!event.end.endsWith('T00:00')) dates.add(event.end.slice(0, 10));
-      }
-    }
-    return dates;
-  });
 
   headerDescription = computed(() => {
     dayjs.locale(this.currentLang()); // Legge il signal per aggiornare il titolo al cambio di lingua.
@@ -162,7 +153,9 @@ export class CalendarComponent implements OnDestroy {
 
   /** Indica se il giorno ha contenuti; il template lo usa per mostrare il segnalino. */
   hasContent(day: CalendarDay): boolean {
-    return this.datesWithContent().has(this.dayLink(day)[1]);
+    const dateKey = this.dayLink(day)[1];
+    const days = this.storage.days();
+    return eventsOnDay(days, dateKey).length > 0 || (days[dateKey]?.extra.length ?? 0) > 0;
   }
 
   /** Confronta un giorno con quello selezionato; il template lo usa per stile e accessibilità. */

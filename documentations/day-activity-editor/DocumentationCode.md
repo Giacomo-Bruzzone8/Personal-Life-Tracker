@@ -56,6 +56,7 @@ It is designed to be usable with the keyboard and with a screen reader.
 | Import | From | What it is used for here |
 |---|---|---|
 | `formatDate` | `functions/date-utils` | Turns a `Date` into the `YYYY-MM-DD` text used as the day key. |
+| `eventsOnDay` | `functions/day-events` | Returns the activities of the day, including those started the day before (`events`). |
 | `TimelineEvent` | `models/calendar-event.model` | Type describing a time-based activity and its 7 types. |
 | `EVENT_COLORS`, `eventTitle` | `models/event-presentation` | Colour of each activity type and title to show in the list. |
 | `StorageService` | `services/storage.service` | Reads and saves the days with their activities. |
@@ -830,9 +831,8 @@ Returns the date shifted by a given number of days,
 e.g. `shiftDay('2026-11-19', -1)` → `'2026-11-18'`.
 
 **When it is called**
-Only from inside the component (`private`): from `events` (previous day),
-from `save()` (5.9, neighbouring days for the overlaps) and from `toDateTimes()`
-(5.16, next day).
+Only from inside the component (`private`): from `save()` (5.9, neighbouring days
+for the overlaps) and from `toDateTimes()` (5.16, next day).
 
 **How it works**
 1. `dayjs(day)` reads the date in the `YYYY-MM-DD` format.

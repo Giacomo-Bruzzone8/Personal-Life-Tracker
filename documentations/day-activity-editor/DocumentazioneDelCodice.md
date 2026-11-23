@@ -56,6 +56,7 @@ I dati vengono letti e salvati tramite `StorageService`.
 | Import | Da dove | A cosa serve qui |
 |---|---|---|
 | `formatDate` | `functions/date-utils` | Trasforma una `Date` nel testo `YYYY-MM-DD` usato come chiave del giorno. |
+| `eventsOnDay` | `functions/day-events` | Restituisce le attività del giorno, incluse quelle iniziate il giorno prima (`events`). |
 | `TimelineEvent` | `models/calendar-event.model` | Tipo che descrive un'attività legata al tempo e i suoi 7 tipi. |
 | `EVENT_COLORS`, `eventTitle` | `models/event-presentation` | Colore di ogni tipo di attività e titolo da mostrare nell'elenco. |
 | `StorageService` | `services/storage.service` | Legge e salva le giornate con le loro attività. |
@@ -830,9 +831,8 @@ Restituisce la data spostata di un certo numero di giorni,
 es. `shiftDay('2026-11-19', -1)` → `'2026-11-18'`.
 
 **Quando viene chiamato**
-Solo dall'interno del componente (`private`): da `events` (giorno precedente),
-da `save()` (5.9, giorni vicini per le sovrapposizioni) e da `toDateTimes()`
-(5.16, giorno successivo).
+Solo dall'interno del componente (`private`): da `save()` (5.9, giorni vicini
+per le sovrapposizioni) e da `toDateTimes()` (5.16, giorno successivo).
 
 **Come funziona**
 1. `dayjs(day)` legge la data nel formato `YYYY-MM-DD`.

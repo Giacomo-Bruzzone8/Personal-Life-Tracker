@@ -10,6 +10,7 @@ import { TimelineEvent, NonTimelineEvent } from '../../models/calendar-event.mod
 import { EVENT_COLORS, eventTitle } from '../../models/event-presentation';
 import { dayEventPortions } from '../../functions/timeline-portions';
 import { formatDate, parseDate } from '../../functions/date-utils';
+import { eventsOnDay } from '../../functions/day-events';
 import { StorageService } from '../../services/storage.service';
 import { CircularTimeline } from '../circular-timeline/circular-timeline';
 
@@ -44,8 +45,7 @@ export class DayDetailComponent implements OnDestroy {
     const detail = this.detail();
     return detail?.date === formatDate(this.date()) ? detail : null;
   });
-  previousDay = computed(() => this.storage.getDay(formatDate(dayjs(this.date()).subtract(1, 'day').toDate())));
-  timeline = computed(() => [...(this.previousDay()?.timeline ?? []), ...(this.dayDetail()?.timeline ?? [])]);
+  timeline = computed(() => eventsOnDay(this.storage.days(), formatDate(this.date())));
   extra = computed(() => this.dayDetail()?.extra ?? []);
   activityPortions = computed(() => dayEventPortions(this.timeline(), this.date()));
   activities = computed(() => [...new Set(this.activityPortions().map(portion => portion.event))]);
