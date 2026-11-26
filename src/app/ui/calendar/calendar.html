@@ -30,6 +30,9 @@
     {
       <a class="calendar-cell"
          [routerLink]="dayLink(day)"
+         [attr.data-date]="dayKey(day)"
+         [attr.tabindex]="dayKey(day) === focusDay() ? 0 : -1"
+         (keydown)="moveFocus($event, day)"
          [attr.aria-label]="dayLabel(day)
            + (day.isToday ? ' · ' + ('CalendarComponent.Legend.Today' | translate) : '')
            + (hasContent(day) ? ' · ' + ('CalendarComponent.Legend.HasContent' | translate) : '')"

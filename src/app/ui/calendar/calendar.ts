@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -26,6 +26,7 @@ export class CalendarComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
+  private readonly injector = inject(Injector);
   private readonly today = dayjs();
 
   // Stato modificabile dalle azioni dell'utente e dal cambio di lingua.
@@ -36,6 +37,15 @@ export class CalendarComponent {
     return month ? dayjs(month) : this.today;
   });
   currentLang = signal<string>('');
+  // Ultimo giorno raggiunto con le frecce (YYYY-MM-DD).
+  activeDay = signal<string | null>(null);
+  // Giorno raggiungibile con Tab: l'ultimo raggiunto con le frecce se è nel mese mostrato, altrimenti oggi o il primo del mese.
+  focusDay = computed(() => {
+    const first = this.currentDate().startOf('month');
+    const active = this.activeDay();
+    if (active?.startsWith(first.format('YYYY-MM'))) return active;
+    return (this.today.isSame(first, 'month') ? this.today : first).format('YYYY-MM-DD');
+  });
 
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
   headerDescription = computed(() => {
@@ -83,9 +93,14 @@ export class CalendarComponent {
 
   // Metodi di supporto usati dal template per rappresentare i giorni.
 
-  /** Crea la rotta del dettaglio; è usato dal link del menu e dall'etichetta del giorno. */
+  /** Data del giorno nel formato YYYY-MM-DD, usata come chiave per dati, link e focus. */
+  dayKey(day: CalendarDay): string {
+    return formatDate(new Date(day.year, day.month, day.date));
+  }
+
+  /** Crea la rotta del dettaglio del giorno; è usata dal link di ogni cella. */
   dayLink(day: CalendarDay): string[] {
-    return ['/day', formatDate(new Date(day.year, day.month, day.date))];
+    return ['/day', this.dayKey(day)];
   }
 
   /** Data leggibile del giorno (es. "giovedì 19 novembre 2026"); il template la usa come nome per lo screen reader. */
@@ -95,7 +110,7 @@ export class CalendarComponent {
 
   /** Indica se il giorno ha contenuti; il template lo usa per mostrare il segnalino. */
   hasContent(day: CalendarDay): boolean {
-    const dateKey = formatDate(new Date(day.year, day.month, day.date));
+    const dateKey = this.dayKey(day);
     const days = this.storage.days();
     return eventsOnDay(days, dateKey).length > 0 || (days[dateKey]?.extra.length ?? 0) > 0;
   }
@@ -112,8 +127,24 @@ export class CalendarComponent {
     this.showMonth(this.currentDate().add(1, 'month'));
   }
 
+  /** Frecce nella griglia: sposta il focus di un giorno (← →) o di una settimana (↑ ↓), cambiando mese se serve. */
+  moveFocus(event: KeyboardEvent, day: CalendarDay): void {
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    const step = steps[event.key];
+    if (!step) return;
+    event.preventDefault();
+
+    const target = dayjs(new Date(day.year, day.month, day.date)).add(step, 'day');
+    const key = target.format('YYYY-MM-DD');
+    this.activeDay.set(key);
+    // Dopo l'aggiornamento della griglia, dà il focus alla cella del giorno raggiunto.
+    const focus = () => afterNextRender(() => document.querySelector<HTMLElement>(`.calendar-cell[data-date="${key}"]`)?.focus(), { injector: this.injector });
+    if (target.isSame(this.currentDate(), 'month')) focus();
+    else this.showMonth(target).then(focus);
+  }
+
   /** Scrive il mese nell'indirizzo; il calendario si aggiorna leggendolo da `currentDate`. */
-  private showMonth(date: Dayjs): void {
-    this.router.navigate([], { relativeTo: this.route, queryParams: { month: date.format('YYYY-MM') }, replaceUrl: true });
+  private showMonth(date: Dayjs): Promise<boolean> {
+    return this.router.navigate([], { relativeTo: this.route, queryParams: { month: date.format('YYYY-MM') }, replaceUrl: true });
   }
 }
