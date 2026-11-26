@@ -48,12 +48,8 @@ export class CalendarComponent implements OnDestroy {
   month = computed(() => this.currentDate().month());
 
   headerDescription = computed(() => {
-    dayjs.locale(this.currentLang()); // Legge il signal per aggiornare il titolo al cambio di lingua.
-
-    const date = dayjs().year(this.year()).month(this.month());
-    const monthName = date.format('MMMM');
-
-    return monthName.charAt(0).toUpperCase() + monthName.slice(1) + ' ' + this.year();
+    const title = this.currentDate().locale(this.currentLang()).format('MMMM YYYY');
+    return title.charAt(0).toUpperCase() + title.slice(1);
   });
 
   // Giorni mostrati nella griglia, inclusi quelli dei mesi adiacenti.
