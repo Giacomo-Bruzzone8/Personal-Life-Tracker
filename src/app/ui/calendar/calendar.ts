@@ -155,6 +155,11 @@ export class CalendarComponent implements OnDestroy {
     return ['/day', formatDate(new Date(day.year, day.month, day.date))];
   }
 
+  /** Data leggibile del giorno (es. "giovedì 19 novembre 2026"); il template la usa come nome per lo screen reader. */
+  dayLabel(day: CalendarDay): string {
+    return dayjs(new Date(day.year, day.month, day.date)).locale(this.currentLang()).format('dddd D MMMM YYYY');
+  }
+
   /** Indica se il giorno ha contenuti; il template lo usa per mostrare il segnalino. */
   hasContent(day: CalendarDay): boolean {
     const dateKey = this.dayLink(day)[1];

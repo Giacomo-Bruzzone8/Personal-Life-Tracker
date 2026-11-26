@@ -30,7 +30,9 @@
     {
       <a class="calendar-cell"
          [routerLink]="dayLink(day)"
-         [attr.aria-label]="dayLink(day)[1] + (hasContent(day) ? ' · ' + ('CalendarComponent.Legend.HasContent' | translate) : '')"
+         [attr.aria-label]="dayLabel(day)
+           + (day.isToday ? ' · ' + ('CalendarComponent.Legend.Today' | translate) : '')
+           + (hasContent(day) ? ' · ' + ('CalendarComponent.Legend.HasContent' | translate) : '')"
          [class.current-month]="day.currentMonth"
          [class.previous-month]="day.previousMonth"
          [class.next-month]="day.nextMonth"
