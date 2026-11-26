@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import dayjs, { Dayjs } from 'dayjs';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/it';
 import 'dayjs/locale/en';
 import { Subject, takeUntil } from 'rxjs';
-import { formatDate } from '../../functions/date-utils';
+import { formatDate, parseDate } from '../../functions/date-utils';
 import { eventsOnDay } from '../../functions/day-events';
 import { CalendarDay } from '../../models/calendar-day.model';
 import { StorageService } from '../../services/storage.service';
@@ -27,12 +28,19 @@ export class CalendarComponent implements OnDestroy {
 
   // Dipendenze e valori iniziali usati dal calendario.
   private readonly storage = inject(StorageService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
   private readonly destroy = new Subject<void>();
   private readonly today = dayjs();
 
   // Stato modificabile dalle azioni dell'utente e dal cambio di lingua.
   daysOfWeek: string[] = [];
-  currentDate = signal<Dayjs>(this.today);
+  // Mese mostrato: letto dall'indirizzo (?month=YYYY-MM), altrimenti il mese corrente.
+  currentDate = computed(() => {
+    const month = parseDate(`${this.queryParams().get('month') ?? ''}-01`);
+    return month ? dayjs(month) : this.today;
+  });
   currentLang = signal<string>('');
 
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
@@ -158,15 +166,16 @@ export class CalendarComponent implements OnDestroy {
 
   /** Mostra il mese precedente quando si preme la freccia sinistra. */
   previousMonth(): void {
-    const today = this.currentDate();
-    const lastToday = dayjs(today).subtract(1, 'month');
-    this.currentDate.set(lastToday);
+    this.showMonth(this.currentDate().subtract(1, 'month'));
   }
 
   /** Mostra il mese successivo quando si preme la freccia destra. */
   nextMonth(): void {
-    const today = this.currentDate();
-    const nextToday = dayjs(today).add(1, 'month');
-    this.currentDate.set(nextToday);
+    this.showMonth(this.currentDate().add(1, 'month'));
+  }
+
+  /** Scrive il mese nell'indirizzo; il calendario si aggiorna leggendolo da `currentDate`. */
+  private showMonth(date: Dayjs): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: { month: date.format('YYYY-MM') }, replaceUrl: true });
   }
 }

@@ -1,6 +1,6 @@
 <section class="day-detail">
   <header class="header">
-    <a class="back" [routerLink]="backLink()">‹ {{ 'NavbarComponent.Calendar' | translate }}</a>
+    <a class="back" [routerLink]="backLink()" [queryParams]="{ month: currentDate().format('YYYY-MM') }">‹ {{ 'NavbarComponent.Calendar' | translate }}</a>
     <div class="weekday-row">
       <span class="weekday">{{ weekday() }}</span>
       @if (isToday()) {

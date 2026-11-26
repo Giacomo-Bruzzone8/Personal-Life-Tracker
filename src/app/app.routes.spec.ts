@@ -37,7 +37,7 @@ describe('Page navigation', () => {
     const second = await harness.navigateByUrl('/day/2026-10-03', DayDetailComponent);
     expect(formatDate(second.date())).toBe('2026-10-03');
     expect(harness.routeNativeElement?.textContent).toContain('3 ottobre 2026');
-    expect(harness.routeNativeElement?.querySelector('a.back')?.getAttribute('href')).toBe('/calendar');
+    expect(harness.routeNativeElement?.querySelector('a.back')?.getAttribute('href')).toBe('/calendar?month=2026-10');
   });
 
   it('redirects malformed and impossible dates to the calendar', async () => {
