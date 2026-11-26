@@ -13,11 +13,12 @@ import { formatDate, parseDate } from '../../functions/date-utils';
 import { eventsOnDay } from '../../functions/day-events';
 import { StorageService } from '../../services/storage.service';
 import { CircularTimeline } from '../circular-timeline/circular-timeline';
+import { DayActivityEditor } from '../day-activity-editor/day-activity-editor';
 
 @Component({
   selector: 'app-day-detail',
   standalone: true,
-  imports: [RouterLink, TranslateModule, CircularTimeline],
+  imports: [RouterLink, TranslateModule, CircularTimeline, DayActivityEditor],
   templateUrl: './day-detail.html',
   styleUrl: './day-detail.scss',
 })
@@ -32,6 +33,7 @@ export class DayDetailComponent implements OnDestroy {
 
   // SIGNAL
   currentLang = signal<string>('en');
+  editorOpen = signal(false);
   private destroy = new Subject<void>();
 
   // COMPUTED SIGNAL
@@ -65,6 +67,16 @@ export class DayDetailComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.destroy.next();
     this.destroy.complete();
+  }
+
+  openActivityEditor(): void {
+    this.editorOpen.set(true);
+  }
+
+  closeActivityEditor(): void {
+    this.editorOpen.set(false);
+    // Accessibilità: riporta il focus sul pulsante che ha aperto la finestra, così chi usa uno screen reader riprende da lì.
+    document.querySelector<HTMLElement>('.manage-activities')?.focus();
   }
 
   activityTime(event: TimelineEvent): string {

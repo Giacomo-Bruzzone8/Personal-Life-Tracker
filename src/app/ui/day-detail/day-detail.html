@@ -8,6 +8,9 @@
       }
     </div>
     <h1>{{ fullDate() }}</h1>
+    <div class="day-actions">
+      <button type="button" class="manage-activities" (click)="openActivityEditor()">{{ 'DayDetailComponent.ManageActivities' | translate }}</button>
+    </div>
   </header>
 
   <div class="day-content">
@@ -54,3 +57,7 @@
     </section>
   </div>
 </section>
+
+@if (editorOpen()) {
+  <app-day-activity-editor [date]="date()" (closed)="closeActivityEditor()" />
+}

@@ -23,6 +23,18 @@
   color: var(--surface-background);
 }
 
+.day-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.day-actions button {
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-background);
+  color: var(--app-text);
+  font: inherit;
+  cursor: pointer;
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+}
+
 .day-content {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);

@@ -42,7 +42,8 @@
     "Summary": "{{count}} activities · {{minutes}} minutes recorded",
     "Duration": "{{minutes}} min",
     "EmptyActivities": "No activities recorded for this day.",
-    "EmptyExtra": "No additional information recorded for this day."
+    "EmptyExtra": "No additional information recorded for this day.",
+    "ManageActivities": "Manage temporary activities"
   },
   "DayActivityEditor": {
     "Manage": "Manage day activities",
