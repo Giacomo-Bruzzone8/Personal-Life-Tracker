@@ -31,7 +31,8 @@ export class CalendarComponent {
 
   // Stato modificabile dalle azioni dell'utente e dal cambio di lingua.
   daysOfWeek: string[] = [];
-  // Mese mostrato: letto dall'indirizzo (?month=YYYY-MM), altrimenti il mese corrente.
+  
+  // 1.1
   currentDate = computed(() => {
     const month = parseDate(`${this.queryParams().get('month') ?? ''}-01`);
     return month ? dayjs(month) : this.today;
@@ -39,7 +40,7 @@ export class CalendarComponent {
   currentLang = signal<string>('');
   // Ultimo giorno raggiunto con le frecce (YYYY-MM-DD).
   activeDay = signal<string | null>(null);
-  // Giorno raggiungibile con Tab: l'ultimo raggiunto con le frecce se è nel mese mostrato, altrimenti oggi o il primo del mese.
+  // 1.2
   focusDay = computed(() => {
     const first = this.currentDate().startOf('month');
     const active = this.activeDay();
@@ -48,12 +49,13 @@ export class CalendarComponent {
   });
 
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
+  // 1.3
   headerDescription = computed(() => {
     const title = this.currentDate().locale(this.currentLang()).format('MMMM YYYY');
     return title.charAt(0).toUpperCase() + title.slice(1);
   });
 
-  // Giorni mostrati nella griglia: settimane intere da lunedì a domenica, inclusi i giorni dei mesi adiacenti.
+  // 1.4
   calendarDays = computed<CalendarDay[]>(() => {
     const firstOfMonth = this.currentDate().startOf('month');
     const leadingDays = (firstOfMonth.day() + 6) % 7; // Giorni del mese precedente prima del primo: lunedì corrisponde a 0.
@@ -74,8 +76,7 @@ export class CalendarComponent {
     });
   });
 
-
-  /** Imposta la lingua iniziale e ascolta i cambi di lingua dell'applicazione. */
+  // 1.5
   constructor(private translate: TranslateService) {
     this.updateLanguage(translate.getCurrentLang() || 'en');
     // takeUntilDestroyed interrompe l'ascolto della lingua quando Angular rimuove il calendario.
@@ -83,7 +84,7 @@ export class CalendarComponent {
       .subscribe(event => this.updateLanguage(event.lang));
   }
 
-  /** Aggiorna titolo e nomi dei giorni; è chiamato all'avvio e a ogni cambio di lingua. */
+  // 1.6
   private updateLanguage(lang: string): void {
     this.currentLang.set(lang);
     const weekdays = dayjs().locale(lang).localeData().weekdaysShort()
@@ -93,22 +94,22 @@ export class CalendarComponent {
 
   // Metodi di supporto usati dal template per rappresentare i giorni.
 
-  /** Data del giorno nel formato YYYY-MM-DD, usata come chiave per dati, link e focus. */
+  // 1.7
   dayKey(day: CalendarDay): string {
     return formatDate(new Date(day.year, day.month, day.date));
   }
 
-  /** Crea la rotta del dettaglio del giorno; è usata dal link di ogni cella. */
+  // 1.8
   dayLink(day: CalendarDay): string[] {
     return ['/day', this.dayKey(day)];
   }
 
-  /** Data leggibile del giorno (es. "giovedì 19 novembre 2026"); il template la usa come nome per lo screen reader. */
+  // 1.9
   dayLabel(day: CalendarDay): string {
     return dayjs(new Date(day.year, day.month, day.date)).locale(this.currentLang()).format('dddd D MMMM YYYY');
   }
 
-  /** Indica se il giorno ha contenuti; il template lo usa per mostrare il segnalino. */
+  // 1.10
   hasContent(day: CalendarDay): boolean {
     const dateKey = this.dayKey(day);
     const days = this.storage.days();
@@ -117,17 +118,17 @@ export class CalendarComponent {
 
   // Metodi richiamati dalle interazioni con il calendario.
 
-  /** Mostra il mese precedente quando si preme la freccia sinistra. */
+  // 1.11
   previousMonth(): void {
     this.showMonth(this.currentDate().subtract(1, 'month'));
   }
 
-  /** Mostra il mese successivo quando si preme la freccia destra. */
+  // 1.11
   nextMonth(): void {
     this.showMonth(this.currentDate().add(1, 'month'));
   }
 
-  /** Frecce nella griglia: sposta il focus di un giorno (← →) o di una settimana (↑ ↓), cambiando mese se serve. */
+  // 1.12
   moveFocus(event: KeyboardEvent, day: CalendarDay): void {
     const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
     const step = steps[event.key];
@@ -143,7 +144,7 @@ export class CalendarComponent {
     else this.showMonth(target).then(focus);
   }
 
-  /** Scrive il mese nell'indirizzo; il calendario si aggiorna leggendolo da `currentDate`. */
+  // 1.13
   private showMonth(date: Dayjs): Promise<boolean> {
     return this.router.navigate([], { relativeTo: this.route, queryParams: { month: date.format('YYYY-MM') }, replaceUrl: true });
   }
