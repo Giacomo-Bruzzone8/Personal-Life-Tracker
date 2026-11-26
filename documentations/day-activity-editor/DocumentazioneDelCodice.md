@@ -2,7 +2,7 @@
 
 ## 1. Il componente in sintesi
 
-Finestra modale che il calendario apre dalla voce "Gestisci attività" del menu di un giorno.
+Finestra modale che la pagina del giorno (`DayDetail`) apre con il pulsante sotto la data.
 Permette di aggiungere, modificare ed eliminare le attività legate al tempo di quel giorno
 (Sonno, Lavoro, Studio, Lettura, Sport, Tempo libero, Attività personalizzata).
 Ogni attività occupa un intervallo orario (inizio e fine): è questo intervallo che permette
@@ -21,7 +21,7 @@ I dati vengono letti e salvati tramite `StorageService`.
 | Import | A cosa serve qui |
 |---|---|
 | `Component` | Dichiara la classe come componente Angular (selettore, template, stili). |
-| `input`, `output` | Ricevono il giorno dal calendario (`date`) e gli segnalano la chiusura (`closed`). |
+| `input`, `output` | Ricevono il giorno dalla pagina che apre la finestra (`date`) e le segnalano la chiusura (`closed`). |
 | `signal`, `computed` | Stato reattivo della finestra e valori derivati dalla data (es. `dateKey`, `events`, `startDay`). |
 | `effect` | Ripristina il form ogni volta che cambia il giorno. |
 | `inject` | Ottiene i servizi necessari (`StorageService`, `Injector`). |
@@ -91,7 +91,7 @@ reagisce al cambio del tipo di attività, nasconde gli errori quando l'utente
 modifica un campo e ripristina il form ogni volta che cambia il giorno.
 
 **Quando viene chiamato**
-Una sola volta, da Angular, quando il calendario apre la finestra.
+Una sola volta, da Angular, quando la pagina del giorno apre la finestra.
 
 **Come funziona**
 1. **Cambio del tipo di attività**
@@ -106,7 +106,7 @@ Una sola volta, da Angular, quando il calendario apre la finestra.
    modifica il form.
 3. **Cambio del giorno**
    `effect` riesegue il suo contenuto ogni volta che cambia un signal letto al suo interno.
-   Legge `dateKey()`, quindi si riattiva all'apertura e a ogni nuovo giorno passato dal calendario. Allora:
+   Legge `dateKey()`, quindi si riattiva all'apertura e a ogni nuovo giorno ricevuto. Allora:
    - `resetForm()` svuota il form e imposta come inizio l'ora attuale del giorno scelto;
    - `pendingDelete` torna a `null`, chiudendo un'eventuale conferma di eliminazione.
 
@@ -152,7 +152,7 @@ per questo servono entrambi.
 5. Se si va avanti dall'ultimo, il focus passa al primo; se si va indietro
    dal primo, passa all'ultimo.
 6. `event.preventDefault()` blocca lo spostamento normale del Tab,
-   che altrimenti porterebbe il focus fuori dalla finestra (sul calendario).
+   che altrimenti porterebbe il focus fuori dalla finestra (sulla pagina sottostante).
 
 ### 5.3 — @ViewChild closeButton + ngAfterViewInit()
 
@@ -167,7 +167,7 @@ ngAfterViewInit(): void
 **Scopo**
 All'apertura della finestra porta il focus sul pulsante di chiusura (×).
 Così chi usa la tastiera o uno screen reader si trova subito dentro la finestra,
-invece di restare sul calendario sottostante.
+invece di restare sulla pagina sottostante.
 
 **Quando viene chiamato**
 `ngAfterViewInit` è chiamato da Angular una sola volta, appena il template
@@ -199,8 +199,8 @@ close(): void
 ```
 
 **Scopo**
-Chiede al calendario di chiudere la finestra.
-La finestra non si chiude da sola: avvisa il calendario, che decide di rimuoverla.
+Chiede alla pagina del giorno di chiudere la finestra.
+La finestra non si chiude da sola: avvisa la pagina, che decide di rimuoverla.
 
 **Quando viene chiamato**
 In tre modi:
@@ -211,10 +211,10 @@ In tre modi:
 **Come funziona**
 1. `@HostListener('document:keydown.escape')` ascolta il tasto Esc su tutta la pagina
    e, quando viene premuto, chiama `close()`.
-2. `this.closed.emit()` invia l'evento di output `closed` al calendario.
-3. Il calendario lo riceve con `(closed)="closeActivityEditor()"`: imposta
-   `editorDate` a `null`, così la finestra viene rimossa, e riporta il focus
-   sul giorno selezionato.
+2. `this.closed.emit()` invia l'evento di output `closed` alla pagina del giorno.
+3. La pagina lo riceve con `(closed)="closeActivityEditor()"`: imposta
+   `editorOpen` a `false`, così la finestra viene rimossa, e riporta il focus
+   sul pulsante che l'aveva aperta.
 
 **Note**
 - Un clic dentro la finestra non la chiude, perché la `<section>` blocca il clic

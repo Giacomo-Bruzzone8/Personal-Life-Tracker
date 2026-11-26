@@ -4,8 +4,8 @@
 
 ### What it does
 `DayActivityEditor` connects the selected calendar day to its timeline: it lets you
-add, edit and delete the timed activities of that day. It opens from the calendar
-(right-click on a day → "Manage activities").
+add, edit and delete the timed activities of that day. It opens from the day
+detail page, with the button under the date.
 An activity can continue past midnight: it is saved in the day it starts and is
 shown, and can be edited, in both days.
 The window can be used entirely with the keyboard and with a screen reader.
@@ -33,7 +33,7 @@ Code details: [DocumentationCode.md](DocumentationCode.md)
 ### Cosa fa
 `DayActivityEditor` fa da tramite tra il giorno selezionato nel calendario e la sua
 timeline: permette di aggiungere, modificare ed eliminare le attività con orario di
-quel giorno. Si apre dal calendario (clic destro su un giorno → "Gestisci attività").
+quel giorno. Si apre dalla pagina del giorno, con il pulsante sotto la data.
 Un'attività può proseguire oltre la mezzanotte: si salva nel giorno in cui inizia ed è
 visibile, e modificabile, in entrambi i giorni.
 La finestra è utilizzabile interamente da tastiera e con screen reader.

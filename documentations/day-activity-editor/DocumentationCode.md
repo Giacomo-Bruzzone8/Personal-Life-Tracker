@@ -2,7 +2,7 @@
 
 ## 1. The component at a glance
 
-Modal window that the calendar opens from the "Manage activities" item in a day's menu.
+Modal window that the day detail page (`DayDetail`) opens with the button under the date.
 It lets the user add, edit and delete the time-based activities of that day
 (Sleep, Work, Study, Reading, Sport, Free time, Custom activity).
 Each activity takes up a time interval (start and end): this interval is what allows
@@ -21,7 +21,7 @@ It is designed to be usable with the keyboard and with a screen reader.
 | Import | What it is used for here |
 |---|---|
 | `Component` | Declares the class as an Angular component (selector, template, styles). |
-| `input`, `output` | Receive the day from the calendar (`date`) and notify it of the closing (`closed`). |
+| `input`, `output` | Receive the day from the page that opens the window (`date`) and notify it of the closing (`closed`). |
 | `signal`, `computed` | Reactive state of the window and values derived from the date (e.g. `dateKey`, `events`, `startDay`). |
 | `effect` | Resets the form every time the day changes. |
 | `inject` | Obtains the required services (`StorageService`, `Injector`). |
@@ -91,7 +91,7 @@ it reacts to the change of activity type, hides the errors when the user
 edits a field and resets the form every time the day changes.
 
 **When it is called**
-Only once, by Angular, when the calendar opens the window.
+Only once, by Angular, when the day detail page opens the window.
 
 **How it works**
 1. **Change of activity type**
@@ -106,7 +106,7 @@ Only once, by Angular, when the calendar opens the window.
    edits the form.
 3. **Change of day**
    `effect` re-runs its content every time a signal read inside it changes.
-   It reads `dateKey()`, so it runs again when the window opens and for every new day passed by the calendar. Then:
+   It reads `dateKey()`, so it runs again when the window opens and for every new day received. Then:
    - `resetForm()` clears the form and sets the current time of the chosen day as the start;
    - `pendingDelete` goes back to `null`, closing any open delete confirmation.
 
@@ -152,7 +152,7 @@ which is why both are needed.
 5. Moving forward from the last element, the focus goes to the first; moving backwards
    from the first, it goes to the last.
 6. `event.preventDefault()` blocks the normal Tab movement,
-   which would otherwise take the focus outside the window (onto the calendar).
+   which would otherwise take the focus outside the window (onto the page underneath).
 
 ### 5.3 — @ViewChild closeButton + ngAfterViewInit()
 
@@ -167,7 +167,7 @@ ngAfterViewInit(): void
 **Purpose**
 When the window opens, it moves the focus to the close button (×).
 This way, keyboard and screen reader users find themselves inside the window straight away,
-instead of staying on the calendar underneath.
+instead of staying on the page underneath.
 
 **When it is called**
 `ngAfterViewInit` is called by Angular only once, as soon as the window
@@ -199,8 +199,8 @@ close(): void
 ```
 
 **Purpose**
-Asks the calendar to close the window.
-The window does not close by itself: it notifies the calendar, which decides to remove it.
+Asks the day detail page to close the window.
+The window does not close by itself: it notifies the page, which decides to remove it.
 
 **When it is called**
 In three ways:
@@ -211,10 +211,10 @@ In three ways:
 **How it works**
 1. `@HostListener('document:keydown.escape')` listens for the Esc key on the whole page
    and, when it is pressed, calls `close()`.
-2. `this.closed.emit()` sends the `closed` output event to the calendar.
-3. The calendar receives it with `(closed)="closeActivityEditor()"`: it sets
-   `editorDate` to `null`, so the window is removed, and moves the focus back
-   to the selected day.
+2. `this.closed.emit()` sends the `closed` output event to the day detail page.
+3. The page receives it with `(closed)="closeActivityEditor()"`: it sets
+   `editorOpen` to `false`, so the window is removed, and moves the focus back
+   to the button that opened it.
 
 **Notes**
 - A click inside the window does not close it, because the `<section>` stops the click
