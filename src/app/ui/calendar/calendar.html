@@ -5,13 +5,13 @@
 
 <div class="calendar-container">
   <header class="calendar-header">
-    <button class="nav-btn" (click)="previousMonth()">&#10094;</button> 
+    <button type="button" class="nav-btn" (click)="previousMonth()" [attr.aria-label]="'CalendarComponent.PreviousMonth' | translate">&#10094;</button>
 
-    <h2 class="header-title">
+    <h2 class="header-title" aria-live="polite">
       {{ headerDescription() }}
     </h2>
 
-    <button class="nav-btn" (click)="nextMonth()">&#10095;</button> 
+    <button type="button" class="nav-btn" (click)="nextMonth()" [attr.aria-label]="'CalendarComponent.NextMonth' | translate">&#10095;</button>
   </header>
 
   <!-- DAY OF WEEK -->

@@ -14,6 +14,8 @@
     "Language": "Language"
   },
   "CalendarComponent": {
+    "PreviousMonth": "Previous month",
+    "NextMonth": "Next month",
     "Legend": {
       "PreviousMonth": "Days from previous month",
       "CurrentMonth": "Days of current month",
