@@ -53,14 +53,12 @@
   grid-template-columns: repeat(7, 1fr);
   gap: 6px;
 
-  .calendar-day {
-    position: relative;
-    min-width: 0;
-  }
-
   .calendar-cell
   {
     position: relative;
+    display: block;
+    box-sizing: border-box;
+    text-decoration: none;
     width: 100%;
     background: transparent;
     font: inherit;
@@ -81,48 +79,6 @@
       color: var(--surface-background);
       font-weight: bold;
     }
-
-    &.selected { border: 3px solid var(--selected-color); }
-  }
-
-  .calendar-context-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 2;
-    min-width: max-content;
-    padding: 4px;
-    border: 1px solid var(--surface-border);
-    border-radius: 6px;
-    background: var(--surface-background);
-    box-shadow: var(--surface-shadow);
-
-    a, button {
-      display: block;
-      box-sizing: border-box;
-      width: 100%;
-      padding: 8px 10px;
-      border: 0;
-      background: transparent;
-      color: var(--surface-text);
-      font: inherit;
-      text-align: left;
-      text-decoration: none;
-      cursor: pointer;
-
-      &:hover, &:focus-visible {
-        background: var(--focus-color);
-        color: var(--surface-background);
-      }
-    }
-  }
-
-  .calendar-day:nth-child(7n + 4) .calendar-context-menu,
-  .calendar-day:nth-child(7n + 5) .calendar-context-menu,
-  .calendar-day:nth-child(7n + 6) .calendar-context-menu,
-  .calendar-day:nth-child(7n) .calendar-context-menu {
-    right: 0;
-    left: auto;
   }
 }
 
@@ -175,7 +131,6 @@
       &.current-month { background-color: var(--surface-text); }
       &.next-month { background-color: var(--next-month); }
       &.today { background-color: var(--today-color);}
-      &.selected { border: 3px solid var(--selected-color); }
     }
   }
 }

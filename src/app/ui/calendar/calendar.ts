@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import dayjs, { Dayjs } from 'dayjs';
@@ -11,14 +11,13 @@ import { formatDate } from '../../functions/date-utils';
 import { eventsOnDay } from '../../functions/day-events';
 import { CalendarDay } from '../../models/calendar-day.model';
 import { StorageService } from '../../services/storage.service';
-import { DayActivityEditor } from '../day-activity-editor/day-activity-editor';
 
 dayjs.extend(localeData);
 
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, TranslateModule, RouterLink, DayActivityEditor],
+  imports: [CommonModule, TranslateModule, RouterLink],
   templateUrl: './calendar.html',
   styleUrls: ['./calendar.scss'],
 })
@@ -34,9 +33,6 @@ export class CalendarComponent implements OnDestroy {
   // Stato modificabile dalle azioni dell'utente e dal cambio di lingua.
   daysOfWeek: string[] = [];
   currentDate = signal<Dayjs>(this.today);
-  selectedDate = signal<CalendarDay | null>(null);
-  menuDay = signal<CalendarDay | null>(null);
-  editorDate = signal<Date | null>(null);
   currentLang = signal<string>('');
 
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
@@ -158,21 +154,10 @@ export class CalendarComponent implements OnDestroy {
     return eventsOnDay(days, dateKey).length > 0 || (days[dateKey]?.extra.length ?? 0) > 0;
   }
 
-  /** Confronta un giorno con quello selezionato; il template lo usa per stile e accessibilità. */
-  isDaySelected(candidate: CalendarDay): boolean {
-    const current = this.selectedDate();
-    if (!current) return false;
-
-    return current.year === candidate.year
-      && current.month === candidate.month
-      && current.date === candidate.date;
-  }
-
   // Metodi richiamati dalle interazioni con il calendario.
 
   /** Mostra il mese precedente quando si preme la freccia sinistra. */
   previousMonth(): void {
-    this.closeMenu();
     const today = this.currentDate();
     const lastToday = dayjs(today).subtract(1, 'month');
     this.currentDate.set(lastToday);
@@ -180,43 +165,8 @@ export class CalendarComponent implements OnDestroy {
 
   /** Mostra il mese successivo quando si preme la freccia destra. */
   nextMonth(): void {
-    this.closeMenu();
     const today = this.currentDate();
     const nextToday = dayjs(today).add(1, 'month');
     this.currentDate.set(nextToday);
-  }
-
-  /** Seleziona un giorno al clic sinistro e chiude l'eventuale menu aperto. */
-  selectDay(day: CalendarDay): void {
-    this.selectedDate.set(day);
-    this.closeMenu();
-  }
-
-  /** Al clic destro seleziona il giorno e apre il suo menu al posto di quello del browser. */
-  openDayMenu(event: MouseEvent, day: CalendarDay): void {
-    event.preventDefault();
-    this.selectedDate.set(day);
-    this.menuDay.set(day);
-  }
-
-  /** Apre la finestra delle attività dalla voce del menu relativa al giorno scelto. */
-  openActivityEditor(day: CalendarDay): void {
-    this.selectedDate.set(day);
-    this.closeMenu();
-    this.editorDate.set(new Date(day.year, day.month, day.date, 12));
-  }
-
-  /** Nasconde la finestra quando il componente delle attività emette l'evento di chiusura. */
-  closeActivityEditor(): void {
-    this.editorDate.set(null);
-    // Accessibilità: riporta il focus sul giorno selezionato, così chi usa uno screen reader riprende da lì.
-    document.querySelector<HTMLElement>('.calendar-cell.selected')?.focus();
-  }
-
-  /** Chiude il menu a un clic nel documento, con Esc o durante altre azioni del calendario. */
-  @HostListener('document:click')
-  @HostListener('document:keydown.escape')
-  closeMenu(): void {
-    this.menuDay.set(null);
   }
 }

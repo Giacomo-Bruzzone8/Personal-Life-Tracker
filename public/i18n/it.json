@@ -14,14 +14,11 @@
     "Language": "Lingua"
   },
   "CalendarComponent": {
-    "OpenDayDetail": "Apri dettaglio del giorno",
-    "ManageActivities": "Gestisci attività",
     "Legend": {
       "PreviousMonth": "Giorni del mese precedente",
       "CurrentMonth": "Giorni del mese corrente",
       "NextMonth": "Giorni del mese successivo",
       "Today": "Oggi",
-      "SelectedDay": "Giorno selezionato",
       "HasContent": "Contenuti registrati"
     }
   },
@@ -31,7 +28,7 @@
     "Description": "Timeline circolare delle attività della giornata"
   },
   "Pages": {
-    "CalendarDescription": "Seleziona un giorno con un clic; usa il tasto destro per vedere le opzioni.",
+    "CalendarDescription": "Seleziona un giorno per aprirne il dettaglio e gestirne le attività.",
     "ComingSoon": "Questa sezione è in preparazione.",
     "OpenCalendar": "Apri il calendario"
   },

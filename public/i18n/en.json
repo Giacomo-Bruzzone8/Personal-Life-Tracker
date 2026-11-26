@@ -14,14 +14,11 @@
     "Language": "Language"
   },
   "CalendarComponent": {
-    "OpenDayDetail": "Open day details",
-    "ManageActivities": "Manage activities",
     "Legend": {
       "PreviousMonth": "Days from previous month",
       "CurrentMonth": "Days of current month",
       "NextMonth": "Days from next month",
       "Today": "Today",
-      "SelectedDay": "Selected day",
       "HasContent": "Recorded content"
     }
   },
@@ -31,7 +28,7 @@
     "Description": "Circular timeline of daily activities"
   },
   "Pages": {
-    "CalendarDescription": "Click a day to select it; right-click to see its options.",
+    "CalendarDescription": "Select a day to open its details and manage its activities.",
     "ComingSoon": "This section is coming soon.",
     "OpenCalendar": "Open calendar"
   },
@@ -43,7 +40,7 @@
     "Duration": "{{minutes}} min",
     "EmptyActivities": "No activities recorded for this day.",
     "EmptyExtra": "No additional information recorded for this day.",
-    "ManageActivities": "Manage temporary activities"
+    "ManageActivities": "Manage timed activities"
   },
   "DayActivityEditor": {
     "Manage": "Manage day activities",
