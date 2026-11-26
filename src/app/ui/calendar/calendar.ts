@@ -1,13 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import dayjs, { Dayjs } from 'dayjs';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/it';
 import 'dayjs/locale/en';
-import { Subject, takeUntil } from 'rxjs';
 import { formatDate, parseDate } from '../../functions/date-utils';
 import { eventsOnDay } from '../../functions/day-events';
 import { CalendarDay } from '../../models/calendar-day.model';
@@ -23,7 +22,7 @@ dayjs.extend(localeData);
   styleUrls: ['./calendar.scss'],
 })
 
-export class CalendarComponent implements OnDestroy {
+export class CalendarComponent {
 
 
   // Dipendenze e valori iniziali usati dal calendario.
@@ -31,7 +30,6 @@ export class CalendarComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
-  private readonly destroy = new Subject<void>();
   private readonly today = dayjs();
 
   // Stato modificabile dalle azioni dell'utente e dal cambio di lingua.
@@ -124,16 +122,9 @@ export class CalendarComponent implements OnDestroy {
   /** Imposta la lingua iniziale e ascolta i cambi di lingua dell'applicazione. */
   constructor(private translate: TranslateService) {
     this.updateLanguage(translate.getCurrentLang() || 'en');
-    translate.onLangChange.pipe(takeUntil(this.destroy))
-      .subscribe((event) => {
-        this.updateLanguage(event.lang);
-      });
-  }
-
-  /** Interrompe l'ascolto della lingua quando Angular rimuove il calendario. */
-  ngOnDestroy(): void {
-    this.destroy.next();
-    this.destroy.complete();
+    // takeUntilDestroyed interrompe l'ascolto della lingua quando Angular rimuove il calendario.
+    translate.onLangChange.pipe(takeUntilDestroyed())
+      .subscribe(event => this.updateLanguage(event.lang));
   }
 
   /** Aggiorna titolo e nomi dei giorni; è chiamato all'avvio e a ogni cambio di lingua. */
