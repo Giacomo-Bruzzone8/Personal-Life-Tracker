@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -17,7 +16,7 @@ dayjs.extend(localeData);
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, TranslateModule, RouterLink],
+  imports: [TranslateModule, RouterLink],
   templateUrl: './calendar.html',
   styleUrls: ['./calendar.scss'],
 })
