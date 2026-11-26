@@ -20,10 +20,7 @@ dayjs.extend(localeData);
   templateUrl: './calendar.html',
   styleUrls: ['./calendar.scss'],
 })
-
 export class CalendarComponent {
-
-
   // Dipendenze e valori iniziali usati dal calendario.
   private readonly storage = inject(StorageService);
   private readonly route = inject(ActivatedRoute);
@@ -148,7 +145,7 @@ export class CalendarComponent {
 
   /** Indica se il giorno ha contenuti; il template lo usa per mostrare il segnalino. */
   hasContent(day: CalendarDay): boolean {
-    const dateKey = this.dayLink(day)[1];
+    const dateKey = formatDate(new Date(day.year, day.month, day.date));
     const days = this.storage.days();
     return eventsOnDay(days, dateKey).length > 0 || (days[dateKey]?.extra.length ?? 0) > 0;
   }
