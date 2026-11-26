@@ -38,81 +38,31 @@ export class CalendarComponent {
   currentLang = signal<string>('');
 
   // Valori derivati: si aggiornano quando cambiano data, lingua o attività salvate.
-  year = computed(() => this.currentDate().year());
-  month = computed(() => this.currentDate().month());
-
   headerDescription = computed(() => {
     const title = this.currentDate().locale(this.currentLang()).format('MMMM YYYY');
     return title.charAt(0).toUpperCase() + title.slice(1);
   });
 
-  // Giorni mostrati nella griglia, inclusi quelli dei mesi adiacenti.
-  previousMonthDays = computed<CalendarDay[]>(() => {
-    const currentYear = this.year();
-    const currentMonth = this.month();
+  // Giorni mostrati nella griglia: settimane intere da lunedì a domenica, inclusi i giorni dei mesi adiacenti.
+  calendarDays = computed<CalendarDay[]>(() => {
+    const firstOfMonth = this.currentDate().startOf('month');
+    const leadingDays = (firstOfMonth.day() + 6) % 7; // Giorni del mese precedente prima del primo: lunedì corrisponde a 0.
+    const totalCells = Math.ceil((leadingDays + firstOfMonth.daysInMonth()) / 7) * 7; // Settimane intere.
 
-    const daysInPreviousMonth = dayjs().year(currentYear).month(currentMonth).date(0).date(); // Giorno 0: ultimo giorno del mese precedente.
-    const firstDayOfMonth = dayjs().year(currentYear).month(currentMonth).date(1); // Primo giorno del mese corrente.
-    const firstDayOfWeekIndex = (firstDayOfMonth.day() + 6) % 7; // Lunedì corrisponde a 0.
-
-    return Array.from({ length: firstDayOfWeekIndex }, (_, i) => ({
-      date: daysInPreviousMonth - (firstDayOfWeekIndex - 1 - i),
-      month: currentMonth === 0 ? 11 : currentMonth - 1,
-      year: currentMonth === 0 ? currentYear - 1 : currentYear,
-
-      isToday: false,
-      previousMonth: true,
-      nextMonth: false
-    }));
-  });
-
-  currentMonthDays = computed<CalendarDay[]>(() => {
-    const currentYear = this.year();
-    const currentMonth = this.month();
-    const daysInCurrentMonth = dayjs().year(currentYear).month(currentMonth + 1).date(0).date(); // Giorno 0 del mese successivo: ultimo giorno del mese corrente.
-
-    return Array.from({ length: daysInCurrentMonth }, (_, i) => {
-      const date = i + 1;
-      const isToday =
-        date === this.today.date() &&
-        currentMonth === this.today.month() &&
-        currentYear === this.today.year();
-
+    return Array.from({ length: totalCells }, (_, i) => {
+      const date = firstOfMonth.add(i - leadingDays, 'day');
+      const currentMonth = date.month() === firstOfMonth.month();
       return {
-        year: currentYear,
-        month: currentMonth,
-        date,
-        currentMonth: true,
-        isToday
+        year: date.year(),
+        month: date.month(),
+        date: date.date(),
+        previousMonth: !currentMonth && i < leadingDays,
+        currentMonth,
+        nextMonth: !currentMonth && i >= leadingDays,
+        isToday: currentMonth && date.isSame(this.today, 'day'),
       };
     });
   });
-
-  nextMonthDays = computed<CalendarDay[]>(() => {
-    const currentYear = this.year();
-    const currentMonth = this.month();
-
-    const previousDays = this.previousMonthDays();
-    const currentDays = this.currentMonthDays();
-
-    const totals = [...previousDays, ...currentDays];
-    const missingDays = (7 - (totals.length % 7)) % 7;
-
-    return Array.from({ length: missingDays }, (_, i) => ({
-      year: currentMonth === 11 ? currentYear + 1 : currentYear,
-      month: currentMonth === 11 ? 0 : currentMonth + 1,
-      date: i + 1,
-      isToday: false,
-      previousMonth: false,
-      nextMonth: true
-    }));
-  });
-
-  calendarDays = computed<CalendarDay[]>(() => [
-    ...this.previousMonthDays(),
-    ...this.currentMonthDays(),
-    ...this.nextMonthDays()
-  ]);
 
 
   /** Imposta la lingua iniziale e ascolta i cambi di lingua dell'applicazione. */
